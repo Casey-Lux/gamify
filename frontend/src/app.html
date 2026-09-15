@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#141420" />
+    <meta name="description" content="Gamify — misiones, skills y recompensas." />
+    <link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+    <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/icons/apple-touch-icon.png" />
+    <!--
+      Fase 11 (spec sección 26 "PWA"): iOS Safari does not read
+      manifest.webmanifest's `display`/`name` for its own home-screen
+      install, so it needs these two vendor-prefixed tags directly to open
+      in standalone mode with the right title. Android/desktop Chromium
+      browsers use the manifest itself and ignore these.
+    -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Gamify" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

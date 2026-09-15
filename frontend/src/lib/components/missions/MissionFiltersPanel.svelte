@@ -53,7 +53,7 @@
         filters.coinsMax !== null && { key: 'coinsMax', label: `Monedas ≤ ${filters.coinsMax}` },
         filters.search.trim() !== '' && { key: 'search', label: `"${filters.search}"` }
       ] as (ActiveChip | false)[]
-    ).filter((c): c is ActiveChip => c !== false)
+    ).filter((c): c is ActiveChip => Boolean(c))
   );
 </script>
 

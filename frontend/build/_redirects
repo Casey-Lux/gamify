@@ -1,0 +1,10 @@
+# Fase 13 — spec section 50: adapter-static builds a pure SPA (fallback:
+# 'index.html' in svelte.config.js already writes build/index.html as the
+# shell), but Cloudflare Pages itself does not know that every unmatched
+# path should serve it — without this file, a hard refresh on e.g.
+# /missions/new returns Cloudflare's own 404, not the app.
+#
+# Every real navigation within the app is client-side (SvelteKit's router,
+# src/routes/+layout.ts's auth guard); this rule only matters for direct
+# loads/refreshes/deep links, which is exactly the case that needs it.
+/*    /index.html   200

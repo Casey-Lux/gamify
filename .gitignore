@@ -2,6 +2,7 @@ node_modules/
 .svelte-kit/
 build/
 .env
+frontend/.env
 .env.local
 .DS_Store
 supabase/.temp/

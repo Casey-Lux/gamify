@@ -35,12 +35,21 @@
       await auth.refreshProfile();
     }
   }
+
+  const isOwner = $derived(
+    $workspaceStore.memberships.find((m) => m.workspace_id === workspaceId)?.role === 'OWNER'
+  );
 </script>
 
 <main class="store-page">
   <header class="store-page__header">
     <h1>Tienda</h1>
-    <span class="balance">Saldo: {$auth.profile?.coins ?? 0} monedas</span>
+    <div class="store-page__header-actions">
+      {#if isOwner}
+        <a class="new-item-link" href="/store/new">+ Nuevo item</a>
+      {/if}
+      <span class="balance">Saldo: {$auth.profile?.coins ?? 0} monedas</span>
+    </div>
   </header>
 
   <ActiveEffectsList effects={$storeStore.activeEffects} />
@@ -143,5 +152,16 @@
     border: none;
     color: inherit;
     cursor: pointer;
+  }
+  .new-item-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 0.9rem;
+    border-radius: 0.5rem;
+    background: #4c6ef5;
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
   }
 </style>

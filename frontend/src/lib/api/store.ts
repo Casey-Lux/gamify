@@ -84,3 +84,42 @@ export async function purchaseItem(itemId: string): Promise<PurchaseItemResult> 
 
   return row as PurchaseItemResult;
 }
+
+import type { EffectType } from '$lib/types/domain';
+
+export interface CreateStoreItemInput {
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  effect_type: EffectType;
+  effect_value: number;
+  duration_minutes: number;
+}
+
+/**
+ * Spec section 14: crea un nuevo tipo de item de tienda. `stock` y
+ * `max_stock` NO se envían — la columna tiene default 5 y no es escribible
+ * por el cliente (0015_column_privileges.sql); solo purchase_item la muta.
+ * RLS (store_items_insert_owner) rechaza esto si el usuario no es OWNER
+ * del workspace, así que ese es el único guardián real — la UI solo evita
+ * mostrar el formulario a quien de todas formas no podría usarlo.
+ */
+export async function createStoreItem(input: CreateStoreItemInput): Promise<StoreItem> {
+  const { data, error } = await supabase
+    .from('store_items')
+    .insert({
+      workspace_id: input.workspace_id,
+      name: input.name,
+      description: input.description ?? null,
+      price: input.price,
+      effect_type: input.effect_type,
+      effect_value: input.effect_value,
+      duration_minutes: input.duration_minutes
+    })
+    .select('*')
+    .single();
+
+  if (error) throw new StoreApiError(error.message, error.code);
+  return data as StoreItem;
+}

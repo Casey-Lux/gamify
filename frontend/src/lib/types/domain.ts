@@ -8,6 +8,8 @@
 
 export type WorkspaceRole = 'OWNER' | 'MEMBER';
 export type MissionDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
+/** Stored workflow status. "Vencida" is NOT stored — it is derived (see isOverdue). */
+export type MissionStatus = 'TODO' | 'DOING' | 'DONE';
 export type EffectType = 'XP_MULTIPLIER' | 'COIN_MULTIPLIER' | 'XP_FLAT_BONUS' | 'COIN_FLAT_BONUS';
 export type ActivationStatus = 'ACTIVE' | 'EXPIRED';
 export type WalletTransactionType = 'MISSION_REWARD' | 'ITEM_PURCHASE' | 'ADMIN_ADJUSTMENT';
@@ -80,7 +82,11 @@ export interface Mission {
   difficulty: MissionDifficulty;
   xp_reward: number;
   coin_reward: number;
+  status: MissionStatus;
   due_at: string | null;
+  /** false = date-only deadline: due_at is just the local-midnight anchor of
+   * that day and no time of day is implied. */
+  due_has_time: boolean;
   completed_at: string | null;
   created_at: string;
   updated_at: string;

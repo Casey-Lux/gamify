@@ -3,10 +3,12 @@ import type {
   CompleteMissionResult,
   Mission,
   MissionDifficulty,
+  MissionStatus,
   MissionSubtask,
   MissionWithRelations
 } from '$lib/types/domain';
 import { MISSION_PAGE_SIZE, type MissionFilters, type MissionSort } from '$lib/types/mission-query';
+import { buildDueValue, startOfLocalDay } from '$lib/utils/due-date';
 
 export class MissionApiError extends Error {
   constructor(
@@ -40,22 +42,21 @@ export interface MissionPage {
  * count later grows large enough for `OFFSET` cost to matter, this is an
  * isolated change to this one function.
  */
+const MISSION_SELECT = `
+      id, workspace_id, created_by, assigned_to, skill_id, area_id, title,
+      description, difficulty, xp_reward, coin_reward, status, due_at, due_has_time,
+      completed_at, created_at, updated_at,
+      skill:skills(id, name),
+      area:areas(id, name),
+      subtasks:mission_subtasks(id, mission_id, title, position, completed, completed_at, created_at, updated_at)
+      `;
+
 export async function fetchMissionsPage(
   filters: MissionFilters,
   sort: MissionSort,
   page: number
 ): Promise<MissionPage> {
-  let query = supabase.from('missions').select(
-    `
-      id, workspace_id, created_by, assigned_to, skill_id, area_id, title,
-      description, difficulty, xp_reward, coin_reward, due_at, completed_at,
-      created_at, updated_at,
-      skill:skills(id, name),
-      area:areas(id, name),
-      subtasks:mission_subtasks(id, mission_id, title, position, completed, completed_at, created_at, updated_at)
-      `,
-    { count: 'exact' }
-  );
+  let query = supabase.from('missions').select(MISSION_SELECT, { count: 'exact' });
 
   query = applyFilters(query, filters);
   query = applySort(query, sort);
@@ -79,9 +80,9 @@ export async function fetchMissionsPage(
 // Exported (not just used internally) so filter/sort logic can be unit
 // tested against a fake query-builder double, without a real Supabase client.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function applyFilters(query: any, filters: MissionFilters) {
-  if (filters.status === 'PENDING') query = query.is('completed_at', null);
-  if (filters.status === 'COMPLETED') query = query.not('completed_at', 'is', null);
+export function applyFilters(query: any, filters: MissionFilters, now: number = Date.now()) {
+  const statusClause = buildStatusClause(filters.statuses, now);
+  if (statusClause) query = query.or(statusClause);
 
   if (filters.areaId) query = query.eq('area_id', filters.areaId);
   if (filters.skillId) query = query.eq('skill_id', filters.skillId);
@@ -100,6 +101,37 @@ export function applyFilters(query: any, filters: MissionFilters) {
   }
 
   return query;
+}
+
+/**
+ * PostgREST `or=(...)` expression for the status filter (selected values
+ * combine with OR; an empty selection applies no status filter at all).
+ *
+ * TODO / DOING / DONE are stored statuses. OVERDUE ("vencida") is derived and
+ * mirrors `isDueOverdue` in utils/due-date.ts exactly:
+ *   not completed AND (
+ *     exact deadline  AND due_at < now
+ *     OR date-only    AND due_at < local midnight of today   -- whole day elapsed
+ *   )
+ * so it can overlap with TODO / DOING, and a DONE mission is never overdue.
+ */
+export function buildStatusClause(statuses: MissionFilters['statuses'], now: number): string {
+  const parts: string[] = [];
+  for (const status of statuses) {
+    if (status === 'OVERDUE') {
+      const nowIso = new Date(now).toISOString();
+      const todayStartIso = new Date(startOfLocalDay(now)).toISOString();
+      parts.push(
+        'and(completed_at.is.null,or(' +
+          `and(due_has_time.eq.true,due_at.lt.${nowIso}),` +
+          `and(due_has_time.eq.false,due_at.lt.${todayStartIso})` +
+          '))'
+      );
+    } else {
+      parts.push(`status.eq.${status}`);
+    }
+  }
+  return parts.join(',');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,9 +198,12 @@ export interface NewMissionInput {
   difficulty: MissionDifficulty;
   xpReward: number;
   coinReward: number;
-  /** Datetime-local input value, or empty string for "sin fecha límite"
+  status: MissionStatus;
+  /** `YYYY-MM-DD` from the calendar picker, or '' for "sin fecha límite"
    * (spec section 9: due_at is nullable and not required). */
-  dueAt: string;
+  dueDate: string;
+  /** `HH:MM`, optional. '' = the user chose a date only: no time is assumed. */
+  dueTime: string;
   /** Subtask titles, in display order. Spec section 10: subtasks carry no
    * reward of their own, so only the title is collected here. */
   subtaskTitles: string[];
@@ -186,7 +221,20 @@ export interface NewMissionInput {
  * satisfies section 56 without inventing a `create_mission` RPC the spec
  * never asked for.
  */
-export async function createMission(input: NewMissionInput): Promise<Mission> {
+type MissionFields = Pick<
+  NewMissionInput,
+  | 'skillId'
+  | 'title'
+  | 'description'
+  | 'xpReward'
+  | 'coinReward'
+  | 'dueDate'
+  | 'dueTime'
+  | 'subtaskTitles'
+>;
+
+/** Shared by create and edit so both enforce exactly the same rules. */
+function validateMissionFields(input: MissionFields) {
   const title = input.title.trim();
   const description = input.description.trim();
 
@@ -212,7 +260,20 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
       'La recompensa de monedas debe ser un número entero mayor o igual a 0.'
     );
   }
+
+  let due;
+  try {
+    due = buildDueValue(input.dueDate, input.dueTime);
+  } catch (err) {
+    throw new MissionApiError(err instanceof Error ? err.message : 'La fecha límite no es válida.');
+  }
+
   const subtaskTitles = input.subtaskTitles.map((t) => t.trim()).filter((t) => t.length > 0);
+  return { title, description, due, subtaskTitles };
+}
+
+export async function createMission(input: NewMissionInput): Promise<Mission> {
+  const { title, description, due, subtaskTitles } = validateMissionFields(input);
 
   const { data, error } = await supabase
     .from('missions')
@@ -227,7 +288,9 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
       difficulty: input.difficulty,
       xp_reward: input.xpReward,
       coin_reward: input.coinReward,
-      due_at: input.dueAt.length > 0 ? new Date(input.dueAt).toISOString() : null
+      status: input.status,
+      due_at: due.dueAt,
+      due_has_time: due.dueHasTime
     })
     .select()
     .single();
@@ -254,4 +317,154 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
   }
 
   return mission;
+}
+
+export interface EditableSubtask {
+  /** Present for a subtask that already exists in the database. */
+  id?: string;
+  title: string;
+}
+
+export interface UpdateMissionInput {
+  missionId: string;
+  /** Only an OWNER may change this (RLS `missions_update` + the workspace
+   * consistency trigger); callers pass the current value when not changing it. */
+  assignedTo: string;
+  skillId: string;
+  areaId: string | null;
+  title: string;
+  description: string;
+  difficulty: MissionDifficulty;
+  xpReward: number;
+  coinReward: number;
+  status: MissionStatus;
+  dueDate: string;
+  dueTime: string;
+  subtasks: EditableSubtask[];
+}
+
+/** Loads one mission with the same relations the list uses (for the edit form). */
+export async function fetchMissionById(missionId: string): Promise<MissionWithRelations | null> {
+  const { data, error } = await supabase
+    .from('missions')
+    .select(MISSION_SELECT)
+    .eq('id', missionId)
+    .maybeSingle();
+
+  if (error) throw new MissionApiError(error.message, error.code);
+  return (data as unknown as MissionWithRelations | null) ?? null;
+}
+
+/**
+ * Edits an existing mission. skill_id / workspace_id / created_by /
+ * completed_at are not updatable by the client (0015 column grants), so the
+ * skill cannot change here either — only the fields in the grant are sent.
+ * Subtasks are reconciled: removed rows deleted, existing rows renamed /
+ * reordered (their `completed` state is untouched), new rows inserted.
+ */
+export async function updateMission(input: UpdateMissionInput): Promise<Mission> {
+  const { title, description, due } = validateMissionFields({
+    ...input,
+    subtaskTitles: []
+  });
+
+  const { data, error } = await supabase
+    .from('missions')
+    .update({
+      assigned_to: input.assignedTo,
+      area_id: input.areaId,
+      title,
+      description: description.length > 0 ? description : null,
+      difficulty: input.difficulty,
+      xp_reward: input.xpReward,
+      coin_reward: input.coinReward,
+      status: input.status,
+      due_at: due.dueAt,
+      due_has_time: due.dueHasTime
+    })
+    .eq('id', input.missionId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw new MissionApiError(error.message, error.code);
+  // RLS hides rows the user may not update: PostgREST then returns no row
+  // instead of an error, which must not look like a successful save.
+  if (!data)
+    throw new MissionApiError('No se encontró la misión o no tienes permiso para editarla.');
+
+  const subtaskError = await syncSubtasks(input.missionId, input.subtasks);
+  if (subtaskError) {
+    throw new MissionApiError(
+      `La misión se guardó, pero las submisiones no se pudieron actualizar: ${subtaskError.message}`,
+      subtaskError.code
+    );
+  }
+  return data as Mission;
+}
+
+async function syncSubtasks(missionId: string, edited: EditableSubtask[]) {
+  const wanted = edited
+    .map((t) => ({ ...t, title: t.title.trim() }))
+    .filter((t) => t.title.length > 0);
+
+  const { data: existing, error: listError } = await supabase
+    .from('mission_subtasks')
+    .select('id, title, position')
+    .eq('mission_id', missionId);
+  if (listError) return listError;
+
+  const keepIds = new Set(wanted.filter((t) => t.id).map((t) => t.id as string));
+  const toDelete = (existing ?? []).filter((row) => !keepIds.has(row.id)).map((row) => row.id);
+
+  if (toDelete.length > 0) {
+    const { error } = await supabase.from('mission_subtasks').delete().in('id', toDelete);
+    if (error) return error;
+  }
+
+  for (const [position, subtask] of wanted.entries()) {
+    if (!subtask.id) continue;
+    const current = (existing ?? []).find((row) => row.id === subtask.id);
+    if (current && current.title === subtask.title && current.position === position) continue;
+    const { error } = await supabase
+      .from('mission_subtasks')
+      .update({ title: subtask.title, position })
+      .eq('id', subtask.id);
+    if (error) return error;
+  }
+
+  const inserts = wanted
+    .map((subtask, position) => ({ subtask, position }))
+    .filter(({ subtask }) => !subtask.id)
+    .map(({ subtask, position }) => ({
+      mission_id: missionId,
+      title: subtask.title,
+      position
+    }));
+  if (inserts.length > 0) {
+    const { error } = await supabase.from('mission_subtasks').insert(inserts);
+    if (error) return error;
+  }
+  return null;
+}
+
+/**
+ * Deletes a mission (its subtasks cascade). Completed missions are kept:
+ * mission_completions.mission_id is ON DELETE RESTRICT (immutable history,
+ * 0009), so the database refuses — surfaced here as a readable message.
+ */
+export async function deleteMission(missionId: string): Promise<void> {
+  const { data, error } = await supabase.from('missions').delete().eq('id', missionId).select('id');
+
+  if (error) {
+    if (error.code === '23503') {
+      throw new MissionApiError(
+        'No se puede eliminar una misión completada: forma parte del historial.',
+        error.code
+      );
+    }
+    throw new MissionApiError(error.message, error.code);
+  }
+  if (!data || data.length === 0) {
+    throw new MissionApiError('No se encontró la misión o no tienes permiso para eliminarla.');
+  }
 }

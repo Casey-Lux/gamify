@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { Area, MissionDifficulty, Skill } from '$lib/types/domain';
-  import type { MissionFilters } from '$lib/types/mission-query';
-  import { DIFFICULTY_LABEL } from '$lib/utils/format';
+  import {
+    MISSION_STATUS_FILTER_OPTIONS,
+    type MissionFilters,
+    type MissionStatusFilter
+  } from '$lib/types/mission-query';
+  import { DIFFICULTY_LABEL, MISSION_STATUS_FILTER_LABEL } from '$lib/utils/format';
 
   interface Props {
     filters: MissionFilters;
@@ -22,17 +26,36 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  function toggleStatus(status: MissionStatusFilter, checked: boolean) {
+    const next = checked
+      ? [...filters.statuses, status]
+      : filters.statuses.filter((s) => s !== status);
+    // Keep a stable, canonical order regardless of click order.
+    onChange({ statuses: MISSION_STATUS_FILTER_OPTIONS.filter((s) => next.includes(s)) });
+  }
+
   interface ActiveChip {
     key: keyof MissionFilters;
     label: string;
   }
+
+  const isDefaultStatuses = $derived(
+    filters.statuses.length === 1 && filters.statuses[0] === 'DOING'
+  );
 
   // Individually-removable chips for every filter that isn't at its default
   // value (spec section 21: "Permitir limpiar filtros individualmente...").
   const activeChips = $derived(
     (
       [
-        filters.status !== 'PENDING' && { key: 'status', label: `Estado: ${filters.status}` },
+        !isDefaultStatuses && {
+          key: 'statuses',
+          label: `Estado: ${
+            filters.statuses.length === 0
+              ? 'todos'
+              : filters.statuses.map((s) => MISSION_STATUS_FILTER_LABEL[s]).join(', ')
+          }`
+        },
         filters.areaId && {
           key: 'areaId',
           label: `Área: ${areas.find((a) => a.id === filters.areaId)?.name ?? ''}`
@@ -67,15 +90,6 @@
     />
 
     <select
-      value={filters.status}
-      onchange={(e) => onChange({ status: e.currentTarget.value as MissionFilters['status'] })}
-    >
-      <option value="ALL">Todas</option>
-      <option value="PENDING">Pendientes</option>
-      <option value="COMPLETED">Completadas</option>
-    </select>
-
-    <select
       value={filters.areaId ?? ''}
       onchange={(e) => onChange({ areaId: e.currentTarget.value || null })}
     >
@@ -106,6 +120,20 @@
       {/each}
     </select>
   </div>
+
+  <fieldset class="status-filter">
+    <legend>Estado</legend>
+    {#each MISSION_STATUS_FILTER_OPTIONS as status (status)}
+      <label class="status-option">
+        <input
+          type="checkbox"
+          checked={filters.statuses.includes(status)}
+          onchange={(e) => toggleStatus(status, e.currentTarget.checked)}
+        />
+        {MISSION_STATUS_FILTER_LABEL[status]}
+      </label>
+    {/each}
+  </fieldset>
 
   <div class="filters__row">
     <label class="range-field">
@@ -200,6 +228,34 @@
     border: 1px solid var(--border, #2c2c3a);
     background: var(--input-bg, #14141f);
     color: inherit;
+  }
+  .status-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 1rem;
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border, #2c2c3a);
+    border-radius: 0.5rem;
+  }
+  .status-filter legend {
+    padding: 0 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-muted, #a0a0b0);
+  }
+  .status-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .status-option input {
+    width: 1.1rem;
+    height: 1.1rem;
+    min-height: 0;
   }
   .range-field {
     display: flex;

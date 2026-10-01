@@ -113,12 +113,12 @@ begin
   ) then
     insert into public.missions (
       workspace_id, created_by, assigned_to, skill_id, area_id, title, description,
-      difficulty, xp_reward, coin_reward, due_at
+      difficulty, xp_reward, coin_reward, due_at, status
     )
     values (
       v_workspace_id, v_user_id, v_user_id, v_skill_fitness, v_area_home,
       'Salir a correr 5km', 'Ruta del parque, ritmo cómodo.',
-      'MEDIUM', 50, 10, now() + interval '3 days'
+      'MEDIUM', 50, 10, now() + interval '3 days', 'DOING'
     )
     returning id into v_mission_run;
 
@@ -134,12 +134,12 @@ begin
   ) then
     insert into public.missions (
       workspace_id, created_by, assigned_to, skill_id, area_id, title, description,
-      difficulty, xp_reward, coin_reward, due_at
+      difficulty, xp_reward, coin_reward, due_at, status
     )
     values (
       v_workspace_id, v_user_id, v_user_id, v_skill_study, v_area_school,
       'Leer un capítulo del libro', null,
-      'EASY', 20, 5, null -- sin fecha límite
+      'EASY', 20, 5, null, 'TODO' -- sin fecha límite
     )
     returning id into v_mission_read;
   end if;
@@ -149,12 +149,12 @@ begin
   ) then
     insert into public.missions (
       workspace_id, created_by, assigned_to, skill_id, area_id, title, description,
-      difficulty, xp_reward, coin_reward, due_at
+      difficulty, xp_reward, coin_reward, due_at, status
     )
     values (
       v_workspace_id, v_user_id, v_user_id, v_skill_fitness, null,
       'Ordenar el cuarto', null,
-      'HARD', 80, 15, now() - interval '1 day' -- vencida, sigue completable
+      'HARD', 80, 15, now() - interval '1 day', 'DOING' -- vencida, sigue completable
     )
     returning id into v_mission_clean;
   end if;

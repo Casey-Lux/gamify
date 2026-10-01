@@ -1,11 +1,26 @@
 import type { MissionDifficulty } from './domain';
 
 /**
+ * What the status filter can select. TODO/DOING/DONE are stored statuses;
+ * OVERDUE ("vencida") is a derived condition (not completed + deadline
+ * passed), so it can overlap with TODO/DOING. Selected values combine with
+ * OR; an empty selection means "no status filter" (show everything).
+ */
+export type MissionStatusFilter = 'TODO' | 'DOING' | 'DONE' | 'OVERDUE';
+
+export const MISSION_STATUS_FILTER_OPTIONS: MissionStatusFilter[] = [
+  'TODO',
+  'DOING',
+  'DONE',
+  'OVERDUE'
+];
+
+/**
  * Spec section 21 "Filtros de misiones": all filters are optional and
  * combine with AND (acumulativos). `undefined`/`null` means "not applied".
  */
 export interface MissionFilters {
-  status: 'ALL' | 'PENDING' | 'COMPLETED';
+  statuses: MissionStatusFilter[];
   areaId: string | null;
   skillId: string | null;
   difficulty: MissionDifficulty | null;
@@ -18,8 +33,9 @@ export interface MissionFilters {
   search: string; // matches title (client-side ILIKE via query)
 }
 
+// Default view: only missions in progress.
 export const EMPTY_MISSION_FILTERS: MissionFilters = {
-  status: 'PENDING',
+  statuses: ['DOING'],
   areaId: null,
   skillId: null,
   difficulty: null,

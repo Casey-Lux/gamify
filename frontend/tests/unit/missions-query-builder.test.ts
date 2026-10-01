@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFilters, applySort } from '../../src/lib/api/missions';
+import { applyFilters, applySort, buildStatusClause } from '../../src/lib/api/missions';
 import { EMPTY_MISSION_FILTERS } from '../../src/lib/types/mission-query';
 
 /**
@@ -22,38 +22,55 @@ function createFakeQuery() {
 }
 
 describe('applyFilters', () => {
-  it('applies no filter calls for the all-empty state except the default PENDING status', () => {
+  const NOW = new Date(2026, 5, 15, 14, 30).getTime(); // 15 Jun 2026, 14:30 local
+
+  it('applies only the default doing status when everything else is empty', () => {
     const { proxy, calls } = createFakeQuery();
-    applyFilters(proxy, EMPTY_MISSION_FILTERS);
-    expect(calls).toEqual([{ method: 'is', args: ['completed_at', null] }]);
+    applyFilters(proxy, EMPTY_MISSION_FILTERS, NOW);
+    expect(calls).toEqual([{ method: 'or', args: ['status.eq.DOING'] }]);
   });
 
   it('combines multiple filters acumulativamente (AND, in call order)', () => {
     const { proxy, calls } = createFakeQuery();
-    applyFilters(proxy, {
-      ...EMPTY_MISSION_FILTERS,
-      status: 'ALL',
-      areaId: 'area-1',
-      difficulty: 'HARD',
-      xpMin: 100
-    });
+    applyFilters(
+      proxy,
+      { ...EMPTY_MISSION_FILTERS, statuses: [], areaId: 'area-1', difficulty: 'HARD', xpMin: 100 },
+      NOW
+    );
 
     expect(calls).toContainEqual({ method: 'eq', args: ['area_id', 'area-1'] });
     expect(calls).toContainEqual({ method: 'eq', args: ['difficulty', 'HARD'] });
     expect(calls).toContainEqual({ method: 'gte', args: ['xp_reward', 100] });
-    // status ALL applies neither is() nor not(): no completion filter at all.
-    expect(calls.some((c) => c.args[0] === 'completed_at')).toBe(false);
+    // No status selected: no status filter at all.
+    expect(calls.some((c) => c.method === 'or')).toBe(false);
   });
 
-  it('filters completed missions with not(is null) when status is COMPLETED', () => {
-    const { proxy, calls } = createFakeQuery();
-    applyFilters(proxy, { ...EMPTY_MISSION_FILTERS, status: 'COMPLETED' });
-    expect(calls).toEqual([{ method: 'not', args: ['completed_at', 'is', null] }]);
+  it('ORs several selected stored statuses together', () => {
+    expect(buildStatusClause(['TODO', 'DOING', 'DONE'], NOW)).toBe(
+      'status.eq.TODO,status.eq.DOING,status.eq.DONE'
+    );
+  });
+
+  it('builds the derived "vencida" clause: not completed, exact deadlines vs date-only deadlines', () => {
+    const clause = buildStatusClause(['OVERDUE'], NOW);
+    const nowIso = new Date(NOW).toISOString();
+    const todayStartIso = new Date(2026, 5, 15).toISOString();
+    expect(clause).toBe(
+      'and(completed_at.is.null,or(' +
+        `and(due_has_time.eq.true,due_at.lt.${nowIso}),` +
+        `and(due_has_time.eq.false,due_at.lt.${todayStartIso})` +
+        '))'
+    );
+  });
+
+  it('lets "vencida" be combined with a stored status', () => {
+    const clause = buildStatusClause(['DOING', 'OVERDUE'], NOW);
+    expect(clause.startsWith('status.eq.DOING,and(completed_at.is.null')).toBe(true);
   });
 
   it('trims search text and skips the filter when blank', () => {
     const { proxy, calls } = createFakeQuery();
-    applyFilters(proxy, { ...EMPTY_MISSION_FILTERS, status: 'ALL', search: '   ' });
+    applyFilters(proxy, { ...EMPTY_MISSION_FILTERS, statuses: [], search: '   ' }, NOW);
     expect(calls.some((c) => c.method === 'ilike')).toBe(false);
   });
 });

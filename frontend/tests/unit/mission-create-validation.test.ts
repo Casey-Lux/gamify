@@ -13,7 +13,9 @@ function baseInput(overrides: Partial<NewMissionInput> = {}): NewMissionInput {
     difficulty: 'EASY',
     xpReward: 10,
     coinReward: 5,
-    dueAt: '',
+    status: 'TODO',
+    dueDate: '',
+    dueTime: '',
     subtaskTitles: [],
     ...overrides
   };
@@ -50,5 +52,15 @@ describe('createMission validation', () => {
 
   it('rejects a negative coin reward', async () => {
     await expect(createMission(baseInput({ coinReward: -1 }))).rejects.toThrow(MissionApiError);
+  });
+
+  it('rejects a time without a date', async () => {
+    await expect(createMission(baseInput({ dueTime: '10:00' }))).rejects.toThrow(MissionApiError);
+  });
+
+  it('rejects an impossible date', async () => {
+    await expect(createMission(baseInput({ dueDate: '2026-02-31' }))).rejects.toThrow(
+      MissionApiError
+    );
   });
 });

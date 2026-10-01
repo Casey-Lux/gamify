@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabase/client';
 
   let email = $state('');
@@ -12,13 +13,27 @@
     error = null;
     loading = true;
 
-    const { error: authError } =
-      mode === 'signin'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+    if (mode === 'signin') {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      loading = false;
+      if (authError) error = authError.message;
+      return;
+    }
 
+    const { error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/` }
+    });
     loading = false;
-    if (authError) error = authError.message;
+    if (authError) {
+      error = authError.message;
+      return;
+    }
+    // Whatever happens next on the Supabase side, every new sign-up sees the
+    // "revisa tu correo" screen (also for an already-registered address, which
+    // Supabase deliberately answers identically to avoid leaking accounts).
+    await goto(`/check-email?email=${encodeURIComponent(email)}`);
   }
 </script>
 

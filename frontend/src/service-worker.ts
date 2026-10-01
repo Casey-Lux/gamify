@@ -35,7 +35,13 @@ const CACHE_NAME = `gamify-cache-${version}`;
 // svelte.config.js) is not part of `build`/`files` because it's written by
 // the adapter step, after this manifest is computed, so it's added
 // explicitly.
-const PRECACHE_URLS = build.length > 0 ? [...build, ...files, `${base}/`] : [];
+// `_headers` / `_redirects` are Cloudflare Pages config files, not served as
+// content: precaching them would fail (or cache the app shell under the wrong
+// URL) and abort the whole service worker install.
+const PRECACHE_URLS =
+  build.length > 0
+    ? [...build, ...files.filter((f) => !/\/_(headers|redirects)$/.test(f)), `${base}/`]
+    : [];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

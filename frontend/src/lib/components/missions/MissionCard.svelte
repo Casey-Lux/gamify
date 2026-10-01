@@ -1,19 +1,33 @@
 <script lang="ts">
   import type { MissionWithRelations } from '$lib/types/domain';
-  import { DIFFICULTY_LABEL, formatDueDate, isOverdue } from '$lib/utils/format';
+  import {
+    DIFFICULTY_LABEL,
+    MISSION_STATUS_LABEL,
+    formatDueDate,
+    isOverdue
+  } from '$lib/utils/format';
   import SubtaskList from './SubtaskList.svelte';
 
   interface Props {
     mission: MissionWithRelations;
     completing: boolean;
+    deleting?: boolean;
     onComplete: (missionId: string) => void;
+    onDelete: (mission: MissionWithRelations) => void;
     onSubtaskToggle: (subtaskId: string, completed: boolean) => void;
   }
 
-  let { mission, completing, onComplete, onSubtaskToggle }: Props = $props();
+  let {
+    mission,
+    completing,
+    deleting = false,
+    onComplete,
+    onDelete,
+    onSubtaskToggle
+  }: Props = $props();
 
   const isCompleted = $derived(mission.completed_at !== null);
-  const overdue = $derived(isOverdue(mission.due_at, mission.completed_at));
+  const overdue = $derived(isOverdue(mission.due_at, mission.completed_at, mission.due_has_time));
   const hasSubtasks = $derived(mission.subtasks.length > 0);
   // Spec section 10: the Complete button stays disabled while any subtask is
   // unchecked. The real gate is server-side (complete_mission RPC step 6);
@@ -26,6 +40,9 @@
   <header class="mission-card__header">
     <span class="chip chip--difficulty-{mission.difficulty.toLowerCase()}">
       {DIFFICULTY_LABEL[mission.difficulty]}
+    </span>
+    <span class="chip chip--status-{mission.status.toLowerCase()}">
+      {MISSION_STATUS_LABEL[mission.status]}
     </span>
     {#if overdue}
       <span class="chip chip--overdue">Vencida</span>
@@ -55,7 +72,7 @@
     {/if}
     <div>
       <dt>Vence</dt>
-      <dd>{formatDueDate(mission.due_at)}</dd>
+      <dd>{formatDueDate(mission.due_at, mission.due_has_time)}</dd>
     </div>
   </dl>
 
@@ -81,6 +98,24 @@
       <p class="mission-card__hint">Completa todas las submisiones para poder finalizar.</p>
     {/if}
   {/if}
+
+  <div class="mission-card__actions">
+    {#if !isCompleted}
+      <a class="action-btn" href={`/missions/${mission.id}/edit`}>Editar</a>
+    {/if}
+    <!-- Completed missions are permanent history (mission_completions is
+         ON DELETE RESTRICT), so they cannot be deleted. -->
+    {#if !isCompleted}
+      <button
+        type="button"
+        class="action-btn action-btn--danger"
+        disabled={deleting}
+        onclick={() => onDelete(mission)}
+      >
+        {deleting ? 'Eliminando…' : 'Eliminar'}
+      </button>
+    {/if}
+  </div>
 </article>
 
 <style>
@@ -101,6 +136,7 @@
   }
   .mission-card__header {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
   }
   .chip {
@@ -117,6 +153,15 @@
   }
   .chip--difficulty-hard {
     background: #6b2c2c;
+  }
+  .chip--status-todo {
+    background: #3a3a4a;
+  }
+  .chip--status-doing {
+    background: #2c4a7a;
+  }
+  .chip--status-done {
+    background: #2c5c3a;
   }
   .chip--overdue {
     background: #6b2c2c;
@@ -174,6 +219,36 @@
   }
   .mission-card__complete:disabled {
     background: var(--disabled, #3a3a4a);
+    cursor: not-allowed;
+  }
+  .mission-card__actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .mission-card__actions:empty {
+    display: none;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border, #2c2c3a);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .action-btn--danger {
+    color: #e0574f;
+    border-color: #6b2c2c;
+  }
+  .action-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
   }
   .mission-card__hint {

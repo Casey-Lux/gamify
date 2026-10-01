@@ -1,4 +1,6 @@
-import type { EffectType, MissionDifficulty } from '$lib/types/domain';
+import type { EffectType, MissionDifficulty, MissionStatus } from '$lib/types/domain';
+import type { MissionStatusFilter } from '$lib/types/mission-query';
+import { isDueOverdue } from './due-date';
 
 export const EFFECT_TYPE_LABEL: Record<EffectType, string> = {
   XP_MULTIPLIER: 'Multiplicador de XP',
@@ -34,17 +36,43 @@ export const DIFFICULTY_ORDER: Record<MissionDifficulty, number> = {
   HARD: 2
 };
 
-export function formatDueDate(dueAt: string | null): string {
+/**
+ * "15 ene 2026" for a date-only deadline, "15 ene 2026, 18:30" when the user
+ * also chose a time. A date-only deadline never shows a time.
+ */
+export function formatDueDate(dueAt: string | null, dueHasTime: boolean = false): string {
   if (!dueAt) return 'Sin fecha límite';
   const date = new Date(dueAt);
-  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  const day = date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (!dueHasTime) return day;
+  const time = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${time}`;
 }
 
-/** Whether a mission's due date has passed. A mission without due_at is never overdue. */
-export function isOverdue(dueAt: string | null, completedAt: string | null): boolean {
-  if (!dueAt || completedAt) return false;
-  return new Date(dueAt).getTime() < Date.now();
+/**
+ * Whether a mission's deadline has passed ("vencida"). A mission without
+ * due_at, or already completed, is never overdue. For a date-only deadline
+ * (`dueHasTime = false`) the mission stays on time for the whole chosen day.
+ */
+export function isOverdue(
+  dueAt: string | null,
+  completedAt: string | null,
+  dueHasTime: boolean = true,
+  now: number = Date.now()
+): boolean {
+  return isDueOverdue(dueAt, completedAt, dueHasTime, now);
 }
+
+export const MISSION_STATUS_LABEL: Record<MissionStatus, string> = {
+  TODO: 'To-do',
+  DOING: 'Doing',
+  DONE: 'Done'
+};
+
+export const MISSION_STATUS_FILTER_LABEL: Record<MissionStatusFilter, string> = {
+  ...MISSION_STATUS_LABEL,
+  OVERDUE: 'Vencida'
+};
 
 /**
  * "hace menos de un minuto" / "hace 5 minutos" / "hace 3 horas" style

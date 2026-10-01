@@ -58,9 +58,7 @@
       await goto('/store');
     } catch (err) {
       error =
-        err instanceof StoreApiError
-          ? err.message
-          : 'No se pudo crear el item. Intenta de nuevo.';
+        err instanceof StoreApiError ? err.message : 'No se pudo crear el item. Intenta de nuevo.';
     } finally {
       submitting = false;
     }

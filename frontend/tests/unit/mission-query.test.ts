@@ -6,8 +6,8 @@ import {
 } from '../../src/lib/types/mission-query';
 
 describe('mission query defaults', () => {
-  it('defaults to showing pending missions only', () => {
-    expect(EMPTY_MISSION_FILTERS.status).toBe('PENDING');
+  it('defaults to showing only missions in progress (doing)', () => {
+    expect(EMPTY_MISSION_FILTERS.statuses).toEqual(['DOING']);
   });
 
   it('has no other filter applied by default (acumulativos, not restrictive)', () => {

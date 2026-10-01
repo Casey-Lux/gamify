@@ -14,7 +14,10 @@
 
   let { children } = $props();
 
-  const PUBLIC_ROUTES = new Set(['/login']);
+  // Reachable without a session. Only /login bounces an authenticated user
+  // away; /check-email must stay visible right after sign-up even if Supabase
+  // created a session immediately (email confirmation disabled).
+  const PUBLIC_ROUTES = new Set(['/login', '/check-email']);
 
   onMount(() => {
     void auth.init();
@@ -26,11 +29,15 @@
   // guard runs entirely client-side, once auth state is known.
   $effect(() => {
     if ($auth.loading) return;
-    const isPublic = PUBLIC_ROUTES.has(page.url.pathname);
+    // Unknown routes are handled by +error.svelte, which sends them to `/`
+    // (and `/` then resolves to /login or /missions below).
+    if (page.status === 404) return;
+    const pathname = page.url.pathname;
+    const isPublic = PUBLIC_ROUTES.has(pathname);
 
     if (!$auth.session && !isPublic) {
       void goto('/login');
-    } else if ($auth.session && isPublic) {
+    } else if ($auth.session && pathname === '/login') {
       void goto('/missions');
     }
   });
@@ -48,7 +55,9 @@
     if (workspaceId) void loadCatalog(workspaceId);
   });
 
-  const showChrome = $derived(!!$auth.session && !PUBLIC_ROUTES.has(page.url.pathname));
+  const showChrome = $derived(
+    !!$auth.session && page.status !== 404 && !PUBLIC_ROUTES.has(page.url.pathname)
+  );
 </script>
 
 {#if $auth.loading}

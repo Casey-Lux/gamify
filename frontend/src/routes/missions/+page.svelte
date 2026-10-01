@@ -3,7 +3,13 @@
   import { missionsStore } from '$lib/stores/missions';
   import { skills, areas, catalogFromCache, catalogCachedAt } from '$lib/stores/catalog';
   import { auth } from '$lib/stores/auth';
-  import { completeMission, setSubtaskCompleted, MissionApiError } from '$lib/api/missions';
+  import {
+    completeMission,
+    deleteMission,
+    setSubtaskCompleted,
+    MissionApiError
+  } from '$lib/api/missions';
+  import type { MissionWithRelations } from '$lib/types/domain';
   import { userSkillsStore } from '$lib/stores/user-skills';
   import MissionCard from '$lib/components/missions/MissionCard.svelte';
   import MissionFiltersPanel from '$lib/components/missions/MissionFiltersPanel.svelte';
@@ -12,6 +18,7 @@
   import { MISSION_PAGE_SIZE } from '$lib/types/mission-query';
 
   let completingId = $state<string | null>(null);
+  let deletingId = $state<string | null>(null);
   let completionError = $state<string | null>(null);
   let lastReward = $state<{ xp: number; coins: number; leveledUp: boolean } | null>(null);
 
@@ -35,6 +42,29 @@
         err instanceof MissionApiError ? err.message : 'No se pudo completar la misión.';
     } finally {
       completingId = null;
+    }
+  }
+
+  async function handleDelete(mission: MissionWithRelations) {
+    if (
+      !window.confirm(`¿Eliminar la misión "${mission.title}"? Esta acción no se puede deshacer.`)
+    ) {
+      return;
+    }
+    deletingId = mission.id;
+    completionError = null;
+    try {
+      await deleteMission(mission.id);
+      await missionsStore.load();
+      // Deleting the last row of a page leaves it empty: step back one page.
+      if ($missionsStore.missions.length === 0 && $missionsStore.page > 0) {
+        missionsStore.previousPage();
+      }
+    } catch (err) {
+      completionError =
+        err instanceof MissionApiError ? err.message : 'No se pudo eliminar la misión.';
+    } finally {
+      deletingId = null;
     }
   }
 
@@ -106,7 +136,9 @@
           <MissionCard
             {mission}
             completing={completingId === mission.id}
+            deleting={deletingId === mission.id}
             onComplete={handleComplete}
+            onDelete={handleDelete}
             onSubtaskToggle={handleSubtaskToggle}
           />
         </li>

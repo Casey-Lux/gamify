@@ -35,3 +35,18 @@ export function groupCount<T>(rows: T[], keyFn: (row: T) => string): Map<string,
   }
   return counts;
 }
+
+/**
+ * Running total at the END of each bucket: `baseline` (what had already been
+ * accumulated before the first bucket) plus everything earned up to and
+ * including that bucket. Used for the "XP acumulada" chart.
+ */
+export function cumulativeByBucket(
+  buckets: StatBucket[],
+  entries: { date: string; value: number }[],
+  baseline: number
+): number[] {
+  const perBucket = sumByBucket(buckets, entries);
+  let running = baseline;
+  return perBucket.map((value) => (running += value));
+}

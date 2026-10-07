@@ -5,6 +5,7 @@
 
   const links = [
     { href: '/missions', label: 'Misiones' },
+    { href: '/habits', label: 'Hábitos' },
     { href: '/store', label: 'Tienda' },
     { href: '/statistics', label: 'Estadísticas' },
     { href: '/profile', label: 'Perfil' }

@@ -59,6 +59,9 @@ export async function fetchMissionsPage(
   let query = supabase.from('missions').select(MISSION_SELECT, { count: 'exact' });
 
   query = applyFilters(query, filters);
+  // Habit occurrences (created only when a habit is completed) belong to the
+  // Habits view; they never show up in, or count towards, the mission list.
+  query = query.is('habit_id', null);
   query = applySort(query, sort);
 
   const from = page * MISSION_PAGE_SIZE;

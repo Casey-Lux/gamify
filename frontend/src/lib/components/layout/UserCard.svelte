@@ -4,6 +4,7 @@
   import { fetchLevelProgress } from '$lib/api/level';
   import { getAvatarSignedUrl } from '$lib/api/avatar';
   import CachedNotice from './CachedNotice.svelte';
+  import NotificationBell from './NotificationBell.svelte';
   import type { LevelProgress } from '$lib/types/domain';
 
   interface Props {
@@ -66,29 +67,32 @@
 </script>
 
 <section class="user-card" class:compact={variant === 'compact'}>
-  <button
-    type="button"
-    class="user-card__summary"
-    onclick={toggle}
-    aria-expanded={variant === 'compact' ? expanded : undefined}
-  >
-    <span class="avatar" aria-hidden="true">
-      {#if avatarUrl}
-        <img src={avatarUrl} alt="" />
-      {:else}
-        <span class="avatar-placeholder">{initial}</span>
+  <div class="user-card__top">
+    <button
+      type="button"
+      class="user-card__summary"
+      onclick={toggle}
+      aria-expanded={variant === 'compact' ? expanded : undefined}
+    >
+      <span class="avatar" aria-hidden="true">
+        {#if avatarUrl}
+          <img src={avatarUrl} alt="" />
+        {:else}
+          <span class="avatar-placeholder">{initial}</span>
+        {/if}
+      </span>
+      <span class="summary-text">
+        <strong>{$auth.profile?.display_name ?? 'Jugador'}</strong>
+        <span class="summary-meta"
+          >Nivel {$auth.profile?.level ?? 1} · {$auth.profile?.coins ?? 0} monedas</span
+        >
+      </span>
+      {#if variant === 'compact'}
+        <span class="chevron" aria-hidden="true">{expanded ? '▲' : '▼'}</span>
       {/if}
-    </span>
-    <span class="summary-text">
-      <strong>{$auth.profile?.display_name ?? 'Jugador'}</strong>
-      <span class="summary-meta"
-        >Nivel {$auth.profile?.level ?? 1} · {$auth.profile?.coins ?? 0} monedas</span
-      >
-    </span>
-    {#if variant === 'compact'}
-      <span class="chevron" aria-hidden="true">{expanded ? '▲' : '▼'}</span>
-    {/if}
-  </button>
+    </button>
+    <NotificationBell />
+  </div>
 
   {#if showDetails}
     <div class="user-card__details">
@@ -155,6 +159,11 @@
       z-index: 10;
     }
   }
+  .user-card__top {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
   .user-card__summary {
     display: flex;
     align-items: center;
@@ -164,7 +173,8 @@
     color: inherit;
     padding: 0;
     text-align: left;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     min-height: 44px;
     cursor: default;
   }

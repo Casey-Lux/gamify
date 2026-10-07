@@ -6,6 +6,7 @@
   import { workspaceStore } from '$lib/stores/workspace';
   import { loadCatalog } from '$lib/stores/catalog';
   import { userSkillsStore } from '$lib/stores/user-skills';
+  import { notificationsStore } from '$lib/stores/notifications';
   import { installPrompt } from '$lib/pwa/install-prompt';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import BottomNav from '$lib/components/layout/BottomNav.svelte';
@@ -48,6 +49,15 @@
     if (!$auth.session) return;
     void workspaceStore.load();
     void userSkillsStore.load();
+  });
+
+  // Notification center: refresh periodically and on focus while signed in.
+  $effect(() => {
+    if (!$auth.session) {
+      notificationsStore.reset();
+      return;
+    }
+    return notificationsStore.start();
   });
 
   $effect(() => {

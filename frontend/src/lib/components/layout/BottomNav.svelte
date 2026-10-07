@@ -9,6 +9,7 @@
 
   const links = $derived([
     { href: '/missions', label: 'Misiones', icon: '🗒️' },
+    { href: '/habits', label: 'Hábitos', icon: '🔁' },
     { href: '/store', label: 'Tienda', icon: '🛒' },
     { href: '/statistics', label: 'Stats', icon: '📊' },
     ...(isOwner ? [{ href: '/manage', label: 'Gestionar', icon: '🛠️' }] : []),

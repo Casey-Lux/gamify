@@ -19,6 +19,10 @@ UI que pide esa sección.
 | `GM007` | sin stock (Fase 6)                   | `out of stock`            |
 | `GM008` | error de validación genérico         | `validation error`        |
 
+`complete_habit` (0027) reutiliza los mismos códigos: `GM001`, `GM002` (hábito de
+otro usuario), `GM003`, `GM004` (ya cumplido ese día) y `GM008` (hábito archivado o
+fecha fuera de ±1 día).
+
 PostgreSQL exige que los SQLSTATE tengan exactamente 5 caracteres en
 `[A-Z0-9]`; `GM0xx` cumple ese formato y es improbable que colisione con
 ningún código de error nativo de Postgres.

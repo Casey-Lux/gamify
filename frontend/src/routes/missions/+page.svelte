@@ -105,6 +105,16 @@
     onClearOne={missionsStore.clearFilter}
   />
 
+  <!-- Total rows matching the current search + filters (server-side count,
+       not just the current page). Hidden while a new query is loading so a
+       stale number is never shown next to new criteria. -->
+  <p class="results-count" role="status" aria-live="polite">
+    {#if !$missionsStore.error && !$missionsStore.loading}
+      {$missionsStore.totalCount}
+      {$missionsStore.totalCount === 1 ? 'misión encontrada' : 'misiones encontradas'}
+    {/if}
+  </p>
+
   {#if $missionsStore.fromCache && $missionsStore.cachedAt}
     <CachedNotice cachedAt={$missionsStore.cachedAt} />
   {:else if $catalogFromCache && $catalogCachedAt}
@@ -197,6 +207,13 @@
     color: white;
     font-weight: 600;
     text-decoration: none;
+  }
+  .results-count {
+    margin: 0;
+    min-height: 1.2em;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted, #a0a0b0);
   }
   .missions-list {
     list-style: none;

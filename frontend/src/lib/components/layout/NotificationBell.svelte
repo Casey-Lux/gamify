@@ -12,8 +12,9 @@
 
   function toggle() {
     open = !open;
-    // Fresh data every time the list is opened.
-    if (open) void notificationsStore.refresh();
+    // Re-evaluates what is due right now from the data already in memory;
+    // the sources are refetched when an action changes them, not on every open.
+    if (open) notificationsStore.recompute();
   }
 
   function select(item: NotificationItem) {

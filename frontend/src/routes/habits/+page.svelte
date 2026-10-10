@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { habitsStore } from '$lib/stores/habits';
-  import { notificationsStore } from '$lib/stores/notifications';
   import { auth } from '$lib/stores/auth';
   import { userSkillsStore } from '$lib/stores/user-skills';
   import { completeHabit, HabitApiError } from '$lib/api/habits';
@@ -16,12 +15,11 @@
   let lastReward = $state<{ xp: number; coins: number; leveledUp: boolean } | null>(null);
 
   onMount(() => {
-    void habitsStore.load();
-    // A tab left open past midnight must switch to the new day.
+    void habitsStore.ensureLoaded();
+    // A tab left open past midnight must switch to the new day. Local only:
+    // no query is made when the window regains focus.
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && toLocalDateStr() !== $habitsStore.today) {
-        void habitsStore.load();
-      }
+      if (document.visibilityState === 'visible') habitsStore.syncToday();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -57,18 +55,17 @@
     completingId = habit.id;
     actionError = null;
     try {
-      const result = await completeHabit(habit.id, $habitsStore.today);
+      // Always the real local day at the moment of the action; the database
+      // validates the date and refuses a duplicate.
+      habitsStore.syncToday();
+      const result = await completeHabit(habit.id, toLocalDateStr());
       lastReward = {
         xp: result.xp_awarded,
         coins: result.coins_awarded,
         leveledUp: result.player_leveled_up
       };
-      await Promise.all([
-        habitsStore.load(),
-        auth.refreshProfile(),
-        userSkillsStore.load(),
-        notificationsStore.refresh()
-      ]);
+      // Notifications refresh themselves: completing invalidates 'habits'.
+      await Promise.all([habitsStore.load(), auth.refreshProfile(), userSkillsStore.load()]);
     } catch (err) {
       actionError = err instanceof HabitApiError ? err.message : 'No se pudo completar el hábito.';
       // e.g. already completed from another device: show the real state.
@@ -91,6 +88,7 @@
   <div class="toolbar">
     <p class="today">
       <strong>{todayLabel}</strong>
+      {#if $habitsStore.loaded}· {visible.length} {visible.length === 1 ? 'hábito' : 'hábitos'}{/if}
       {#if !showAll && todayEntries.length > 0}· {doneToday}/{todayEntries.length} cumplidos{/if}
     </p>
     <button

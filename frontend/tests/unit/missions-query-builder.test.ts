@@ -34,13 +34,12 @@ describe('applyFilters', () => {
     const { proxy, calls } = createFakeQuery();
     applyFilters(
       proxy,
-      { ...EMPTY_MISSION_FILTERS, statuses: [], areaId: 'area-1', difficulty: 'HARD', xpMin: 100 },
+      { ...EMPTY_MISSION_FILTERS, statuses: [], areaId: 'area-1', difficulty: 'HARD' },
       NOW
     );
 
     expect(calls).toContainEqual({ method: 'eq', args: ['area_id', 'area-1'] });
     expect(calls).toContainEqual({ method: 'eq', args: ['difficulty', 'HARD'] });
-    expect(calls).toContainEqual({ method: 'gte', args: ['xp_reward', 100] });
     // No status selected: no status filter at all.
     expect(calls.some((c) => c.method === 'or')).toBe(false);
   });

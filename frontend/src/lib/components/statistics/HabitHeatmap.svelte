@@ -5,9 +5,12 @@
   interface Props {
     title: string;
     heatmap: Heatmap;
+    /** When set, days become buttons that select a date to edit its record. */
+    onSelect?: (date: string) => void;
+    selectedDate?: string | null;
   }
 
-  let { title, heatmap }: Props = $props();
+  let { title, heatmap, onSelect, selectedDate = null }: Props = $props();
 
   const STATE_LABEL: Record<HeatmapState, string> = {
     done: 'cumplido',
@@ -18,7 +21,9 @@
   };
   const LEGEND: HeatmapState[] = ['done', 'missed', 'pending', 'off'];
   const summary = $derived(
-    `${heatmap.completed} de ${heatmap.scheduled} días programados cumplidos`
+    heatmap.mode === 'weekly'
+      ? `${heatmap.completed} de ${heatmap.scheduled} veces de tu objetivo semanal cumplidas`
+      : `${heatmap.completed} de ${heatmap.scheduled} días programados cumplidos`
   );
 </script>
 
@@ -32,12 +37,24 @@
       {#each heatmap.weeks as week (week[0]?.date)}
         <div class="week">
           {#each week as cell (cell.date)}
-            <span
-              class={`cell cell--${cell.state}`}
-              title={cell.state === 'future'
-                ? undefined
-                : `${cell.date}: ${STATE_LABEL[cell.state]}`}
-            ></span>
+            {#if onSelect && cell.state !== 'future'}
+              <button
+                type="button"
+                class={`cell cell--${cell.state} cell--button`}
+                class:selected={selectedDate === cell.date}
+                title={`${cell.date}: ${STATE_LABEL[cell.state]}`}
+                aria-label={`${cell.date}: ${STATE_LABEL[cell.state]}`}
+                aria-pressed={selectedDate === cell.date}
+                onclick={() => onSelect(cell.date)}
+              ></button>
+            {:else}
+              <span
+                class={`cell cell--${cell.state}`}
+                title={cell.state === 'future'
+                  ? undefined
+                  : `${cell.date}: ${STATE_LABEL[cell.state]}`}
+              ></span>
+            {/if}
           {/each}
         </div>
       {/each}
@@ -111,6 +128,14 @@
   .cell--off {
     background: #14141f;
     border: 1px solid var(--border, #2c2c3a);
+  }
+  .cell--button {
+    padding: 0;
+    cursor: pointer;
+  }
+  .cell--button.selected {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
   }
   .cell--future {
     background: transparent;

@@ -22,6 +22,8 @@
     coinReward: 5,
     daily: true,
     days: [1, 2, 3, 4, 5, 6, 7],
+    weekly: false,
+    weeklyTarget: 3,
     dayPart: 'ANYTIME',
     reminderTime: '',
     adaptive: true
@@ -37,6 +39,7 @@
     try {
       await createHabit(workspaceId, $auth.session.user.id, {
         ...values,
+        weeklyTarget: values.weekly ? values.weeklyTarget : null,
         areaId: values.areaId.length > 0 ? values.areaId : null
       });
       await goto('/habits');

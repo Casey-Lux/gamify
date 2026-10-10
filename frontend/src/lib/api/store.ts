@@ -1,5 +1,6 @@
 import { supabase } from '$lib/supabase/client';
 import type { ConsumableActivation, PurchaseItemResult, StoreItem } from '$lib/types/domain';
+import { invalidate } from '$lib/utils/freshness';
 
 export class StoreApiError extends Error {
   constructor(
@@ -61,7 +62,8 @@ const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   GM001: 'Debes iniciar sesión para comprar.',
   GM002: 'No tienes acceso a este item.',
   GM003: 'Este item ya no está disponible.',
-  GM006: 'No tienes suficientes monedas para este item.',
+  GM006:
+    'No tienes suficientes monedas para este item.',
   GM007: 'Este item está agotado por ahora.'
 };
 
@@ -82,6 +84,8 @@ export async function purchaseItem(itemId: string): Promise<PurchaseItemResult> 
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new StoreApiError('purchase_item returned no result');
 
+  // Stock, price, balance and active effects changed; wallet history too.
+  invalidate('store', 'statistics');
   return row as PurchaseItemResult;
 }
 
@@ -121,5 +125,6 @@ export async function createStoreItem(input: CreateStoreItemInput): Promise<Stor
     .single();
 
   if (error) throw new StoreApiError(error.message, error.code);
+  invalidate('store');
   return data as StoreItem;
 }

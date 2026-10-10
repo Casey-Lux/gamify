@@ -1,5 +1,18 @@
-import type { Habit, ScheduleEntry, WeekdayPlan, WeekdayStat } from '$lib/types/habits';
-import { addDays, eachDate, isoWeekday, isScheduledOn } from './habit-schedule';
+import type {
+  Habit,
+  ScheduleEntry,
+  WeekdayPlan,
+  WeekdayStat,
+  WeeklyProgress
+} from '$lib/types/habits';
+import {
+  addDays,
+  eachDate,
+  isoWeekday,
+  isScheduledOn,
+  weeklyTargetInForce
+} from './habit-schedule';
+import { planWeekly } from './habit-weekly';
 
 /**
  * Adaptive planning — first version, deliberately simple and explainable.
@@ -95,6 +108,8 @@ export interface HabitDayInfo {
   /** Plan for today's weekday; always REQUIRED when the habit is not adaptive. */
   plan: WeekdayPlan;
   stat: WeekdayStat;
+  /** Set only for "X veces por semana" habits: this week's progress. */
+  weekly?: WeeklyProgress | null;
 }
 
 export function habitDayInfo(
@@ -104,6 +119,33 @@ export function habitDayInfo(
   today: string,
   config: AdaptationConfig = ADAPTATION_CONFIG
 ): HabitDayInfo {
+  // "X veces por semana": there are no concrete weekdays to adapt, so the
+  // days that "tocan" come from this week's progress instead (habit-weekly.ts),
+  // learning the user's usual weekdays from the same lookback window.
+  const weeklyTarget = weeklyTargetInForce(schedule, today);
+  if (weeklyTarget !== null) {
+    const weekly = planWeekly({
+      target: weeklyTarget,
+      completedDates: completedDates,
+      today,
+      adaptive: habit.adaptive,
+      historyFrom: lookbackStart(today, config)
+    });
+    return {
+      scheduledToday: weekly.scheduledToday,
+      doneToday: weekly.doneToday,
+      plan: 'REQUIRED',
+      stat: {
+        weekday: isoWeekday(today),
+        scheduled: 0,
+        completed: 0,
+        rate: null,
+        plan: 'REQUIRED'
+      },
+      weekly: weekly.progress
+    };
+  }
+
   const stats = computeWeekdayStats(schedule, completedDates, today, config);
   const stat = stats[isoWeekday(today) - 1] as WeekdayStat;
   return {

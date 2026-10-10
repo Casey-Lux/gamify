@@ -1,8 +1,9 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { fetchCompletions, fetchSkillProgress, fetchWalletTransactions } from '$lib/api/statistics';
 import { windowStartIso } from '$lib/utils/date-buckets';
 import { getCached, setCached } from '$lib/cache/db';
 import { statisticsCacheKey } from '$lib/cache/keys';
+import { versionOf } from '$lib/utils/freshness';
 import type { WalletTransaction } from '$lib/types/domain';
 import type { CompletionWithContext, SkillProgress, StatGranularity } from '$lib/types/statistics';
 
@@ -38,8 +39,11 @@ const initialState: StatisticsState = {
 
 function createStatisticsStore() {
   const { subscribe, update, set } = writable<StatisticsState>(initialState);
+  /** `versionOf('statistics')` the data on screen was fetched under (-1 = never). */
+  let loadedVersion = -1;
 
   async function load(granularity: StatGranularity) {
+    const version = versionOf('statistics');
     update((s) => ({ ...s, granularity, loading: true, error: null }));
     const sinceIso = windowStartIso(granularity);
     const cacheKey = statisticsCacheKey(granularity);
@@ -59,6 +63,7 @@ function createStatisticsStore() {
         fromCache: false,
         cachedAt: null
       }));
+      loadedVersion = version;
       void setCached<CachedStatistics>('statistics', cacheKey, {
         completions,
         walletTransactions,
@@ -88,15 +93,24 @@ function createStatisticsStore() {
     }
   }
 
+  /** Called when the Statistics view opens: queries only if nothing was
+   * fetched yet or a completion / purchase invalidated the numbers. Keeps the
+   * granularity the user last picked. */
+  function ensureLoaded() {
+    if (loadedVersion !== versionOf('statistics')) return load(get({ subscribe }).granularity);
+    return Promise.resolve();
+  }
+
   function setGranularity(granularity: StatGranularity) {
     void load(granularity);
   }
 
   function reset() {
+    loadedVersion = -1;
     set(initialState);
   }
 
-  return { subscribe, load, setGranularity, reset };
+  return { subscribe, load, ensureLoaded, setGranularity, reset };
 }
 
 export const statisticsStore = createStatisticsStore();

@@ -36,8 +36,10 @@
       difficulty: habit.difficulty,
       xpReward: habit.xp_reward,
       coinReward: habit.coin_reward,
-      daily: isDaily(habit.days_of_week),
+      daily: habit.weekly_target === null && isDaily(habit.days_of_week),
       days: [...habit.days_of_week],
+      weekly: habit.weekly_target !== null,
+      weeklyTarget: habit.weekly_target ?? 3,
       dayPart: habit.day_part,
       reminderTime: habit.reminder_time ? habit.reminder_time.slice(0, 5) : '',
       adaptive: habit.adaptive
@@ -51,6 +53,7 @@
     try {
       await updateHabit(habit, {
         ...values,
+        weeklyTarget: values.weekly ? values.weeklyTarget : null,
         areaId: values.areaId.length > 0 ? values.areaId : null
       });
       await goto('/habits');

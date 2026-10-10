@@ -3,6 +3,7 @@ import { fetchMissionsPage, MissionApiError } from '$lib/api/missions';
 import { getCached, setCached } from '$lib/cache/db';
 import { missionsCacheKey } from '$lib/cache/keys';
 import type { MissionWithRelations } from '$lib/types/domain';
+import { versionOf } from '$lib/utils/freshness';
 import {
   DEFAULT_MISSION_SORT,
   EMPTY_MISSION_FILTERS,
@@ -46,9 +47,13 @@ const initialState: MissionsState = {
 
 function createMissionsStore() {
   const { subscribe, update, set } = writable<MissionsState>(initialState);
+  /** `versionOf('missions')` the data on screen was fetched under (-1 = never
+   * fetched from the network). See utils/freshness.ts. */
+  let loadedVersion = -1;
 
   async function load() {
     const state = get({ subscribe });
+    const version = versionOf('missions');
     update((s) => ({ ...s, loading: true, error: null }));
 
     const cacheKey = missionsCacheKey(state.filters, state.sort, state.page);
@@ -64,6 +69,7 @@ function createMissionsStore() {
         fromCache: false,
         cachedAt: null
       }));
+      loadedVersion = version;
       void setCached<CachedMissionsPage>('missions', cacheKey, result);
     } catch (err) {
       // Network/RLS failure: fall back to this exact query's last cached
@@ -89,6 +95,14 @@ function createMissionsStore() {
         err instanceof MissionApiError ? err.message : 'No se pudieron cargar las misiones.';
       update((s) => ({ ...s, loading: false, error: message, fromCache: false, cachedAt: null }));
     }
+  }
+
+  /** Called when the Missions view opens: queries only if nothing was fetched
+   * yet or a mutation invalidated the list — coming back to the view (or to
+   * the app) never refetches by itself. */
+  function ensureLoaded() {
+    if (loadedVersion !== versionOf('missions')) return load();
+    return Promise.resolve();
   }
 
   function setFilters(filters: Partial<MissionFilters>) {
@@ -126,12 +140,14 @@ function createMissionsStore() {
   }
 
   function reset() {
+    loadedVersion = -1;
     set(initialState);
   }
 
   return {
     subscribe,
     load,
+    ensureLoaded,
     setFilters,
     clearFilters,
     clearFilter,

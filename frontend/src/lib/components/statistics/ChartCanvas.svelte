@@ -1,14 +1,19 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { loadChartJs } from '$lib/chart/load-chartjs';
+  import type { Snippet } from 'svelte';
   import type { Chart, ChartConfiguration } from 'chart.js';
 
   interface Props {
     title: string;
     config: ChartConfiguration;
+    /** Canvas height in px. */
+    height?: number;
+    /** Optional controls (e.g. a selector) shown under the title. */
+    controls?: Snippet;
   }
 
-  let { title, config }: Props = $props();
+  let { title, config, height = 220, controls }: Props = $props();
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let chartInstance: Chart | null = null;
@@ -36,7 +41,8 @@
 
 <figure class="chart-card">
   <figcaption>{title}</figcaption>
-  <div class="chart-card__canvas" role="img" aria-label={title}>
+  {#if controls}{@render controls()}{/if}
+  <div class="chart-card__canvas" style:height={`${height}px`} role="img" aria-label={title}>
     <canvas bind:this={canvasEl}></canvas>
   </div>
 </figure>
@@ -61,6 +67,5 @@
   }
   .chart-card__canvas {
     position: relative;
-    height: 220px;
   }
 </style>

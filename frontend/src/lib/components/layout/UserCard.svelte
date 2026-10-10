@@ -22,8 +22,11 @@
   // level formula itself (Fase 1 rule) — every time total_xp changes (any
   // of those four events refreshes `auth.profile`), it re-asks the
   // `calculate_level_progress` RPC for the current progress bar values.
+  // A primitive, so the effect only re-runs when the XP really changes (not on
+  // every profile refresh that leaves it as it was).
+  const totalXp = $derived($auth.profile?.total_xp);
   $effect(() => {
-    const xp = $auth.profile?.total_xp;
+    const xp = totalXp;
     if (xp === undefined) return;
     // Fase 11: offline, this RPC call fails (it always needs the live
     // server — spec section 7, the formula is never duplicated
@@ -36,14 +39,23 @@
       .catch(() => {});
   });
 
+  const avatarPath = $derived($auth.profile?.avatar_path);
   $effect(() => {
-    const path = $auth.profile?.avatar_path;
+    const path = avatarPath;
     if (!path) {
       avatarUrl = null;
       return;
     }
     void getAvatarSignedUrl(path).then((url) => (avatarUrl = url));
   });
+
+  // Highest level first (ties: more XP, then name). Presentation only: the
+  // store's data and levels are untouched.
+  const orderedSkills = $derived(
+    [...$userSkillsStore.skills].sort(
+      (a, b) => b.level - a.level || b.xp - a.xp || a.skill_name.localeCompare(b.skill_name)
+    )
+  );
 
   const showDetails = $derived(variant === 'full' || expanded);
   const initial = $derived(($auth.profile?.display_name ?? '?').charAt(0).toUpperCase());
@@ -74,18 +86,20 @@
       onclick={toggle}
       aria-expanded={variant === 'compact' ? expanded : undefined}
     >
-      <span class="avatar" aria-hidden="true">
-        {#if avatarUrl}
-          <img src={avatarUrl} alt="" />
-        {:else}
-          <span class="avatar-placeholder">{initial}</span>
-        {/if}
+      <span class="avatar-wrap" aria-hidden="true">
+        <span class="avatar">
+          {#if avatarUrl}
+            <img src={avatarUrl} alt="" />
+          {:else}
+            <span class="avatar-placeholder">{initial}</span>
+          {/if}
+        </span>
+        <span class="level-badge">{$auth.profile?.level ?? 1}</span>
       </span>
       <span class="summary-text">
         <strong>{$auth.profile?.display_name ?? 'Jugador'}</strong>
-        <span class="summary-meta"
-          >Nivel {$auth.profile?.level ?? 1} · {$auth.profile?.coins ?? 0} monedas</span
-        >
+        <span class="summary-meta">Nivel {$auth.profile?.level ?? 1}</span>
+        <span class="summary-meta">{$auth.profile?.coins ?? 0} monedas</span>
       </span>
       {#if variant === 'compact'}
         <span class="chevron" aria-hidden="true">{expanded ? '▲' : '▼'}</span>
@@ -97,27 +111,37 @@
   {#if showDetails}
     <div class="user-card__details">
       {#if levelProgress}
-        <div
-          class="xp-progress"
-          role="progressbar"
-          aria-valuenow={levelProgress.progress_percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div class="xp-progress__bar" style={`width: ${levelProgress.progress_percent}%`}></div>
+        <div class="xp-block">
+          <div class="xp-block__labels">
+            <span>Nivel {levelProgress.level} → {levelProgress.level + 1}</span>
+            <span>{levelProgress.xp_into_level}/{levelProgress.xp_for_next_level} XP</span>
+          </div>
+          <div
+            class="xp-progress"
+            role="progressbar"
+            aria-label="Progreso al siguiente nivel"
+            aria-valuenow={levelProgress.progress_percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div class="xp-progress__bar" style={`width: ${levelProgress.progress_percent}%`}></div>
+          </div>
         </div>
-        <p class="xp-text">
-          {levelProgress.xp_into_level}/{levelProgress.xp_for_next_level} XP para nivel {levelProgress.level +
-            1}
-        </p>
       {/if}
 
-      {#if $userSkillsStore.skills.length > 0}
-        <ul class="skills-list">
-          {#each $userSkillsStore.skills as skill (skill.skill_id)}
-            <li><span>{skill.skill_name}</span><span>Nv. {skill.level}</span></li>
-          {/each}
-        </ul>
+      {#if orderedSkills.length > 0}
+        <div class="skills">
+          <h3>Habilidades</h3>
+          <ul class="skills-list">
+            {#each orderedSkills as skill (skill.skill_id)}
+              <li>
+                <span class="skill-name">{skill.skill_name}</span><span class="skill-level"
+                  >Nv. {skill.level}</span
+                >
+              </li>
+            {/each}
+          </ul>
+        </div>
       {/if}
 
       {#if cacheNotice}
@@ -181,9 +205,30 @@
   .compact .user-card__summary {
     cursor: pointer;
   }
+  .avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .level-badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: #4c6ef5;
+    border: 2px solid var(--surface, #1c1c28);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
   .avatar {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     overflow: hidden;
     flex-shrink: 0;
@@ -223,35 +268,75 @@
   .user-card__details {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+  }
+  .user-card__details {
+    gap: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border, #2c2c3a);
+  }
+  .xp-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .xp-block__labels {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted, #a0a0b0);
   }
   .xp-progress {
-    height: 8px;
+    height: 10px;
     border-radius: 999px;
-    background: #2c2c3a;
+    background: #14141f;
     overflow: hidden;
   }
   .xp-progress__bar {
     height: 100%;
-    background: #4c6ef5;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #4c6ef5, #6fa8ff);
   }
-  .xp-text {
-    margin: 0;
-    font-size: 0.75rem;
+  .skills h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     color: var(--text-muted, #a0a0b0);
   }
+  /* One column in the narrow sidebar, two or more where there is room
+   * (profile page), so the list uses the space instead of a single stack. */
   .skills-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.35rem;
     font-size: 0.85rem;
   }
   .skills-list li {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.5rem;
+    background: #14141f;
+    border: 1px solid var(--border, #2c2c3a);
+    min-width: 0;
+  }
+  .skill-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .skill-level {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6fa8ff;
+    white-space: nowrap;
   }
   .edit-link {
     font-size: 0.8rem;

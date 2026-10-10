@@ -2,7 +2,7 @@
   import type { Habit } from '$lib/types/habits';
   import { HABIT_DAY_PART_LABEL, WEEKDAY_LABEL } from '$lib/types/habits';
   import type { HabitDayInfo } from '$lib/utils/habit-adaptation';
-  import { describeDays } from '$lib/utils/habit-schedule';
+  import { describeFrequency } from '$lib/utils/habit-schedule';
   import { DIFFICULTY_LABEL } from '$lib/utils/format';
 
   interface Props {
@@ -29,7 +29,9 @@
     <h3>{habit.title}</h3>
     {#if habit.description}<p class="habit__desc">{habit.description}</p>{/if}
     <p class="habit__meta">
-      {describeDays(habit.days_of_week)} · {HABIT_DAY_PART_LABEL[habit.day_part]}
+      {describeFrequency(habit.days_of_week, habit.weekly_target)} · {HABIT_DAY_PART_LABEL[
+        habit.day_part
+      ]}
       {#if habit.reminder_time}· ⏰ {habit.reminder_time.slice(0, 5)}{/if}
     </p>
     <p class="habit__meta">
@@ -37,10 +39,18 @@
       +{habit.coin_reward}
       monedas
     </p>
+    {#if info.weekly}
+      <p class="habit__meta">
+        Esta semana: {info.weekly.done}/{info.weekly.target}
+        {#if info.weekly.urgent && !info.doneToday}· te quedan solo los días justos para llegar{/if}
+      </p>
+    {/if}
     <div class="badges">
-      {#if info.doneToday}<span class="badge badge--done">Hecho hoy</span>{/if}
-      {#if !info.scheduledToday && !info.doneToday}
-        <span class="badge">No programado hoy</span>
+      {#if info.weekly && info.weekly.remaining === 0 && !info.doneToday}
+        <span class="badge badge--done">Meta semanal cumplida</span>
+      {:else if info.doneToday}<span class="badge badge--done">Hecho hoy</span>{/if}
+      {#if !info.scheduledToday && !info.doneToday && !(info.weekly && info.weekly.remaining === 0)}
+        <span class="badge">{info.weekly ? 'Hoy no toca' : 'No programado hoy'}</span>
       {/if}
       {#if info.scheduledToday && !info.doneToday && info.plan === 'OPTIONAL' && habit.adaptive}
         <span class="badge badge--optional">Opcional hoy</span>

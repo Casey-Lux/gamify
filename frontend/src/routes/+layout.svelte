@@ -7,6 +7,10 @@
   import { loadCatalog } from '$lib/stores/catalog';
   import { userSkillsStore } from '$lib/stores/user-skills';
   import { notificationsStore } from '$lib/stores/notifications';
+  import { missionsStore } from '$lib/stores/missions';
+  import { habitsStore } from '$lib/stores/habits';
+  import { statisticsStore } from '$lib/stores/statistics';
+  import { storeStore } from '$lib/stores/store';
   import { installPrompt } from '$lib/pwa/install-prompt';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import BottomNav from '$lib/components/layout/BottomNav.svelte';
@@ -43,26 +47,45 @@
     }
   });
 
+  // Keyed by user id (a primitive) so these effects run once per sign-in, not
+  // every time the session object is replaced (token refresh, tab refocus).
+  const userId = $derived($auth.session?.user.id ?? null);
+
+  // Views keep their data in memory between visits, so when the signed-in
+  // user changes (logout, another account) nothing of the previous one may
+  // survive.
+  let lastUserId: string | null = null;
+
   // Once authenticated, load the active workspace, its skill/area catalog,
   // and the User Card's own skill-progress list.
   $effect(() => {
-    if (!$auth.session) return;
+    if (lastUserId !== null && lastUserId !== userId) {
+      missionsStore.reset();
+      habitsStore.reset();
+      statisticsStore.reset();
+      storeStore.reset();
+      userSkillsStore.reset();
+      workspaceStore.reset();
+    }
+    lastUserId = userId;
+    if (!userId) return;
     void workspaceStore.load();
     void userSkillsStore.load();
   });
 
-  // Notification center: refresh periodically and on focus while signed in.
+  // Notification center: loaded once per sign-in and then refreshed only when
+  // an action changes its sources (no polling, no refetch on window focus).
   $effect(() => {
-    if (!$auth.session) {
+    if (!userId) {
       notificationsStore.reset();
       return;
     }
     return notificationsStore.start();
   });
 
+  const activeWorkspaceId = $derived($workspaceStore.activeWorkspaceId);
   $effect(() => {
-    const workspaceId = $workspaceStore.activeWorkspaceId;
-    if (workspaceId) void loadCatalog(workspaceId);
+    if (activeWorkspaceId) void loadCatalog(activeWorkspaceId);
   });
 
   const showChrome = $derived(

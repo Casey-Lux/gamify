@@ -24,12 +24,6 @@ export interface MissionFilters {
   areaId: string | null;
   skillId: string | null;
   difficulty: MissionDifficulty | null;
-  dueBefore: string | null; // ISO date, inclusive upper bound on due_at
-  dueAfter: string | null; // ISO date, inclusive lower bound on due_at
-  xpMin: number | null;
-  xpMax: number | null;
-  coinsMin: number | null;
-  coinsMax: number | null;
   search: string; // matches title (client-side ILIKE via query)
 }
 
@@ -39,12 +33,6 @@ export const EMPTY_MISSION_FILTERS: MissionFilters = {
   areaId: null,
   skillId: null,
   difficulty: null,
-  dueBefore: null,
-  dueAfter: null,
-  xpMin: null,
-  xpMax: null,
-  coinsMin: null,
-  coinsMax: null,
   search: ''
 };
 

@@ -23,6 +23,11 @@ UI que pide esa sección.
 otro usuario), `GM003`, `GM004` (ya cumplido ese día) y `GM008` (hábito archivado o
 fecha fuera de ±1 día).
 
+`backfill_habit_completion` y `move_habit_completion` (0029, edición del historial)
+usan esos mismos códigos: `GM008` = hábito archivado o fecha fuera de la ventana
+editable (últimos 30 días y desde que existe el hábito), `GM004` = ese día ya está
+registrado, `GM003` = no hay registro que mover en la fecha origen.
+
 PostgreSQL exige que los SQLSTATE tengan exactamente 5 caracteres en
 `[A-Z0-9]`; `GM0xx` cumple ese formato y es improbable que colisione con
 ningún código de error nativo de Postgres.

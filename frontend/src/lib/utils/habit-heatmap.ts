@@ -1,11 +1,13 @@
 import type { ScheduleEntry } from '$lib/types/habits';
-import { addDays, isoWeekday, isScheduledOn } from './habit-schedule';
+import { addDays, entryInForce, isoWeekday, isScheduledOn } from './habit-schedule';
 
 /**
  * - done:    completed that day (even if it was not a scheduled day)
  * - missed:  scheduled, already over, not completed
  * - pending: scheduled today, not completed yet
- * - off:     not scheduled (or before the habit existed)
+ * - off:     not scheduled (or before the habit existed). Also every day that
+ *            was not completed under an "X veces por semana" schedule: those
+ *            habits have no concrete days, their goal is judged per week.
  * - future:  after today
  */
 export type HeatmapState = 'done' | 'missed' | 'pending' | 'off' | 'future';
@@ -21,6 +23,9 @@ export interface Heatmap {
   /** Scheduled days up to today (today included) and how many were completed. */
   scheduled: number;
   completed: number;
+  /** 'weekly' when some week was judged against an "X veces por semana" goal: then
+   * `scheduled` / `completed` count weekly goals' completions, not days. */
+  mode: 'days' | 'weekly';
 }
 
 /** First date shown: the Monday of the week that is `weeks - 1` weeks before today's. */
@@ -40,14 +45,24 @@ export function buildHeatmap(
   const columns: HeatmapCell[][] = [];
   let scheduled = 0;
   let completed = 0;
+  let weeklyUsed = false;
 
   for (let w = 0; w < weeks; w++) {
     const column: HeatmapCell[] = [];
+    // "X veces por semana": goal of this column's week and what was done.
+    let weekTarget: number | null = null;
+    let weekDone = 0;
     for (let d = 0; d < 7; d++) {
       const date = addDays(start, w * 7 + d);
       let state: HeatmapState;
       if (date > today) state = 'future';
-      else {
+      else if (entryInForce(schedule, date)?.weekly_target != null) {
+        weekTarget = entryInForce(schedule, date)?.weekly_target ?? null;
+        if (done.has(date)) {
+          weekDone += 1;
+          state = 'done';
+        } else state = 'off';
+      } else {
         const isScheduled = isScheduledOn(schedule, date);
         if (isScheduled) scheduled += 1;
         if (done.has(date)) {
@@ -58,7 +73,12 @@ export function buildHeatmap(
       }
       column.push({ date, state });
     }
+    if (weekTarget !== null) {
+      weeklyUsed = true;
+      scheduled += weekTarget;
+      completed += Math.min(weekDone, weekTarget);
+    }
     columns.push(column);
   }
-  return { weeks: columns, scheduled, completed };
+  return { weeks: columns, scheduled, completed, mode: weeklyUsed ? 'weekly' : 'days' };
 }

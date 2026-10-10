@@ -33,8 +33,8 @@ export function eachDate(from: string, to: string): string[] {
   return out;
 }
 
-/** The days_of_week in force on `dateStr`, or null before the habit started. */
-export function daysInForce(entries: ScheduleEntry[], dateStr: string): number[] | null {
+/** The schedule version in force on `dateStr`, or null before the habit started. */
+export function entryInForce(entries: ScheduleEntry[], dateStr: string): ScheduleEntry | null {
   let current: ScheduleEntry | null = null;
   for (const entry of entries) {
     if (
@@ -44,16 +44,41 @@ export function daysInForce(entries: ScheduleEntry[], dateStr: string): number[]
       current = entry;
     }
   }
-  return current ? current.days_of_week : null;
+  return current;
 }
 
+/** The days_of_week in force on `dateStr`, or null before the habit started. */
+export function daysInForce(entries: ScheduleEntry[], dateStr: string): number[] | null {
+  return entryInForce(entries, dateStr)?.days_of_week ?? null;
+}
+
+/** The "X veces por semana" target in force on `dateStr`, or null when the
+ * habit is scheduled by weekdays (or had not started yet). */
+export function weeklyTargetInForce(entries: ScheduleEntry[], dateStr: string): number | null {
+  return entryInForce(entries, dateStr)?.weekly_target ?? null;
+}
+
+/** True when `dateStr` is a concrete scheduled weekday. A habit configured as
+ * "X veces por semana" has no concrete days, so this is false for those dates
+ * (see utils/habit-weekly.ts for how its days are decided). */
 export function isScheduledOn(entries: ScheduleEntry[], dateStr: string): boolean {
-  const days = daysInForce(entries, dateStr);
-  return days !== null && days.includes(isoWeekday(dateStr));
+  const entry = entryInForce(entries, dateStr);
+  if (!entry || entry.weekly_target != null) return false;
+  return entry.days_of_week.includes(isoWeekday(dateStr));
 }
 
 export function isDaily(days: number[]): boolean {
   return ALL_WEEKDAYS.every((d) => days.includes(d));
+}
+
+/** "3 veces por semana". */
+export function describeWeeklyTarget(target: number): string {
+  return `${target} ${target === 1 ? 'vez' : 'veces'} por semana`;
+}
+
+/** Frequency label of a habit: weekly target when set, otherwise its weekdays. */
+export function describeFrequency(days: number[], weeklyTarget: number | null | undefined): string {
+  return weeklyTarget != null ? describeWeeklyTarget(weeklyTarget) : describeDays(days);
 }
 
 /** "Todos los días" or "Lun, Mié, Vie". */

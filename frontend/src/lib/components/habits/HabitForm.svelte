@@ -12,6 +12,9 @@
     coinReward: number;
     daily: boolean;
     days: number[];
+    /** true = "X veces por semana" (no concrete days), false = by weekdays. */
+    weekly: boolean;
+    weeklyTarget: number;
     dayPart: HabitDayPart;
     reminderTime: string;
     adaptive: boolean;
@@ -78,6 +81,7 @@
       xpReward: Number(values.xpReward),
       coinReward: Number(values.coinReward),
       days: [...values.days],
+      weeklyTarget: Number(values.weeklyTarget),
       reminderTime: reminderEnabled ? values.reminderTime : ''
     });
   }
@@ -96,29 +100,62 @@
 
   <fieldset class="frequency">
     <legend>Frecuencia</legend>
-    <label class="check">
-      <input
-        type="checkbox"
-        checked={values.daily}
-        onchange={(e) => toggleDaily(e.currentTarget.checked)}
-      />
-      Diario
-    </label>
-    <div class="days" role="group" aria-label="Días de la semana">
-      {#each ALL_WEEKDAYS as day (day)}
-        <label class="check day">
-          <input
-            type="checkbox"
-            disabled={values.daily}
-            checked={values.daily || values.days.includes(day)}
-            onchange={(e) => toggleDay(day, e.currentTarget.checked)}
-          />
-          {WEEKDAY_LABEL[day]}
-        </label>
-      {/each}
+    <div class="modes" role="radiogroup" aria-label="Tipo de frecuencia">
+      <label class="check">
+        <input
+          type="radio"
+          name="frequency-mode"
+          checked={!values.weekly}
+          onchange={() => (values.weekly = false)}
+        />
+        Días concretos
+      </label>
+      <label class="check">
+        <input
+          type="radio"
+          name="frequency-mode"
+          checked={values.weekly}
+          onchange={() => (values.weekly = true)}
+        />
+        X veces por semana
+      </label>
     </div>
-    {#if !values.daily && values.days.length === 0}
-      <p class="hint">Elige al menos un día.</p>
+
+    {#if values.weekly}
+      <label>
+        Veces por semana
+        <input type="number" bind:value={values.weeklyTarget} min="1" max="7" step="1" required />
+      </label>
+      <p class="hint">
+        No eliges días: la app decide cuáles te tocan según lo que ya cumpliste esta semana y los
+        días en que sueles hacerlo, y te avisa solo esos días. Si ya llegaste a tu meta, no te
+        recuerda más hasta la semana siguiente.
+      </p>
+    {:else}
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={values.daily}
+          onchange={(e) => toggleDaily(e.currentTarget.checked)}
+        />
+        Diario
+      </label>
+      <div class="days" role="group" aria-label="Días de la semana">
+        {#each ALL_WEEKDAYS as day (day)}
+          <label class="check day">
+            <input
+              type="checkbox"
+              disabled={values.daily}
+              checked={values.daily || values.days.includes(day)}
+              onchange={(e) => toggleDay(day, e.currentTarget.checked)}
+            />
+            {WEEKDAY_LABEL[day]}
+          </label>
+        {/each}
+      </div>
+      {#if !values.daily && values.days.length === 0}
+        <p class="hint">Elige al menos un día.</p>
+      {/if}
     {/if}
   </fieldset>
 
@@ -239,12 +276,17 @@
       grid-template-columns: 1fr;
     }
   }
+  .modes {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1.25rem;
+  }
   .days {
     display: flex;
     flex-wrap: wrap;
     column-gap: 1rem;
   }
-  input:not([type='checkbox']),
+  input:not([type='checkbox']):not([type='radio']),
   select,
   textarea {
     min-height: 44px;

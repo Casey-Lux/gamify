@@ -134,6 +134,21 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
       });
     }
 
+    // "X veces por semana": no day of the week is left to spare, so today is
+    // needed to reach the goal. Same all-day treatment as the special
+    // reminder above (works even if the habit has no reminder time).
+    if (info.weekly?.urgent) {
+      const left = info.weekly.target - info.weekly.done;
+      out.push({
+        key: `habit_weekly:${habit.id}:${s.today}`,
+        type: 'HABIT_REMINDER',
+        title: 'Meta semanal en juego',
+        body: `Te faltan ${left} ${left === 1 ? 'vez' : 'veces'} de «${habit.title}» y ya no sobran días: ¡hoy toca!`,
+        at: dayStart,
+        href: '/habits'
+      });
+    }
+
     // Regular reminder: only once its time has been reached, and never for
     // a day the adaptive logic considers optional.
     const optional = habit.adaptive && info.plan === 'OPTIONAL';
@@ -142,7 +157,9 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
         key: `habit_reminder:${habit.id}:${s.today}`,
         type: 'HABIT_REMINDER',
         title: 'Recordatorio de hábito',
-        body: `Toca «${habit.title}» (${habit.reminder_time.slice(0, 5)}).`,
+        body: `Toca «${habit.title}» (${habit.reminder_time.slice(0, 5)}).${
+          info.weekly ? ` Esta semana: ${info.weekly.done}/${info.weekly.target}.` : ''
+        }`,
         at: dayStart + minutesOf(habit.reminder_time) * 60_000,
         href: '/habits'
       });

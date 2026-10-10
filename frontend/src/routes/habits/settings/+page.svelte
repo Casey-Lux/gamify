@@ -3,14 +3,14 @@
   import { habitsStore } from '$lib/stores/habits';
   import { setHabitArchived, HabitApiError } from '$lib/api/habits';
   import { computeWeekdayStats } from '$lib/utils/habit-adaptation';
-  import { describeDays } from '$lib/utils/habit-schedule';
+  import { describeFrequency } from '$lib/utils/habit-schedule';
   import { HABIT_DAY_PART_LABEL, WEEKDAY_SHORT, type Habit } from '$lib/types/habits';
 
   let busyId = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
   onMount(() => {
-    void habitsStore.load();
+    void habitsStore.ensureLoaded();
   });
 
   const active = $derived($habitsStore.habits.filter((h) => h.archived_at === null));
@@ -84,13 +84,15 @@
           </span>
         </div>
         <p class="meta">
-          {describeDays(habit.days_of_week)} · {HABIT_DAY_PART_LABEL[habit.day_part]} ·
+          {describeFrequency(habit.days_of_week, habit.weekly_target)} · {HABIT_DAY_PART_LABEL[
+            habit.day_part
+          ]} ·
           {habit.reminder_time
             ? `recordatorio ${habit.reminder_time.slice(0, 5)}`
             : 'sin recordatorio'}
           · adaptación {habit.adaptive ? 'activada' : 'desactivada'}
         </p>
-        {#if habit.adaptive && !habit.archived_at}
+        {#if habit.adaptive && !habit.archived_at && habit.weekly_target === null}
           <p class="meta">Patrón por día (últimas semanas):</p>
           <ul class="pattern">
             {#each stats(habit) as s (s.weekday)}

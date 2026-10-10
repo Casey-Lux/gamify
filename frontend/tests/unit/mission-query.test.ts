@@ -14,8 +14,6 @@ describe('mission query defaults', () => {
     expect(EMPTY_MISSION_FILTERS.areaId).toBeNull();
     expect(EMPTY_MISSION_FILTERS.skillId).toBeNull();
     expect(EMPTY_MISSION_FILTERS.difficulty).toBeNull();
-    expect(EMPTY_MISSION_FILTERS.xpMin).toBeNull();
-    expect(EMPTY_MISSION_FILTERS.xpMax).toBeNull();
     expect(EMPTY_MISSION_FILTERS.search).toBe('');
   });
 

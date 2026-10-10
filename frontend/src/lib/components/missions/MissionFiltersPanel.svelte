@@ -20,12 +20,6 @@
 
   const difficulties: MissionDifficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 
-  function numOrNull(value: string): number | null {
-    if (value.trim() === '') return null;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-
   function toggleStatus(status: MissionStatusFilter, checked: boolean) {
     const next = checked
       ? [...filters.statuses, status]
@@ -68,12 +62,6 @@
           key: 'difficulty',
           label: `Dificultad: ${DIFFICULTY_LABEL[filters.difficulty]}`
         },
-        filters.dueAfter && { key: 'dueAfter', label: `Desde: ${filters.dueAfter}` },
-        filters.dueBefore && { key: 'dueBefore', label: `Hasta: ${filters.dueBefore}` },
-        filters.xpMin !== null && { key: 'xpMin', label: `XP ≥ ${filters.xpMin}` },
-        filters.xpMax !== null && { key: 'xpMax', label: `XP ≤ ${filters.xpMax}` },
-        filters.coinsMin !== null && { key: 'coinsMin', label: `Monedas ≥ ${filters.coinsMin}` },
-        filters.coinsMax !== null && { key: 'coinsMax', label: `Monedas ≤ ${filters.coinsMax}` },
         filters.search.trim() !== '' && { key: 'search', label: `"${filters.search}"` }
       ] as (ActiveChip | false)[]
     ).filter((c): c is ActiveChip => Boolean(c))
@@ -134,61 +122,6 @@
       </label>
     {/each}
   </fieldset>
-
-  <div class="filters__row">
-    <label class="range-field">
-      XP mín.
-      <input
-        type="number"
-        min="0"
-        value={filters.xpMin ?? ''}
-        oninput={(e) => onChange({ xpMin: numOrNull(e.currentTarget.value) })}
-      />
-    </label>
-    <label class="range-field">
-      XP máx.
-      <input
-        type="number"
-        min="0"
-        value={filters.xpMax ?? ''}
-        oninput={(e) => onChange({ xpMax: numOrNull(e.currentTarget.value) })}
-      />
-    </label>
-    <label class="range-field">
-      Monedas mín.
-      <input
-        type="number"
-        min="0"
-        value={filters.coinsMin ?? ''}
-        oninput={(e) => onChange({ coinsMin: numOrNull(e.currentTarget.value) })}
-      />
-    </label>
-    <label class="range-field">
-      Monedas máx.
-      <input
-        type="number"
-        min="0"
-        value={filters.coinsMax ?? ''}
-        oninput={(e) => onChange({ coinsMax: numOrNull(e.currentTarget.value) })}
-      />
-    </label>
-    <label class="range-field">
-      Vence desde
-      <input
-        type="date"
-        value={filters.dueAfter ?? ''}
-        oninput={(e) => onChange({ dueAfter: e.currentTarget.value || null })}
-      />
-    </label>
-    <label class="range-field">
-      Vence hasta
-      <input
-        type="date"
-        value={filters.dueBefore ?? ''}
-        oninput={(e) => onChange({ dueBefore: e.currentTarget.value || null })}
-      />
-    </label>
-  </div>
 
   {#if activeChips.length > 0}
     <div class="filters__chips">
@@ -256,12 +189,6 @@
     width: 1.1rem;
     height: 1.1rem;
     min-height: 0;
-  }
-  .range-field {
-    display: flex;
-    flex-direction: column;
-    font-size: 0.75rem;
-    gap: 0.15rem;
   }
   .filters__actions {
     display: flex;

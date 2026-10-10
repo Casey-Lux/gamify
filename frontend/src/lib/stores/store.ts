@@ -6,6 +6,7 @@ import {
   describePurchaseError
 } from '$lib/api/store';
 import type { ConsumableActivation, StoreItem } from '$lib/types/domain';
+import { versionOf } from '$lib/utils/freshness';
 
 export interface StoreState {
   items: StoreItem[];
@@ -27,8 +28,11 @@ const initialState: StoreState = {
 
 function createStoreStore() {
   const { subscribe, update, set } = writable<StoreState>(initialState);
+  /** What the data on screen was fetched for: workspace + `versionOf('store')`. */
+  let loadedFor: { workspaceId: string; version: number } | null = null;
 
   async function load(workspaceId: string) {
+    const version = versionOf('store');
     update((s) => ({ ...s, loading: true, error: null }));
     try {
       const [items, activeEffects] = await Promise.all([
@@ -36,21 +40,21 @@ function createStoreStore() {
         fetchActiveEffects()
       ]);
       update((s) => ({ ...s, items, activeEffects, loading: false }));
+      loadedFor = { workspaceId, version };
     } catch {
       update((s) => ({ ...s, loading: false, error: 'No se pudo cargar la tienda.' }));
     }
   }
 
-  /** Re-fetches just the active-effects list (e.g. on a periodic tick to
-   * drop expired ones, without re-fetching the whole item catalog). */
-  async function refreshActiveEffects() {
-    try {
-      const activeEffects = await fetchActiveEffects();
-      update((s) => ({ ...s, activeEffects }));
-    } catch {
-      // Silently keep the previous list — a transient failure here shouldn't
-      // interrupt the countdown UI; the next tick will retry.
+  /** Called when the Store view opens: queries only if nothing was fetched yet
+   * for this workspace or a purchase / new item invalidated it. Effects that
+   * expire while the view is open are dropped locally (see ActiveEffectsList);
+   * whether one really applies is always decided by Postgres. */
+  function ensureLoaded(workspaceId: string) {
+    if (loadedFor?.workspaceId !== workspaceId || loadedFor.version !== versionOf('store')) {
+      return load(workspaceId);
     }
+    return Promise.resolve();
   }
 
   /**
@@ -67,6 +71,9 @@ function createStoreStore() {
       return result;
     } catch (err) {
       update((s) => ({ ...s, purchasingId: null, purchaseError: describePurchaseError(err) }));
+      // The database just refused the purchase (no funds / out of stock / item
+      // gone): the stock and price on screen may be stale, so show the real ones.
+      void load(workspaceId);
       return null;
     }
   }
@@ -80,13 +87,14 @@ function createStoreStore() {
   }
 
   function reset() {
+    loadedFor = null;
     set(initialState);
   }
 
   return {
     subscribe,
     load,
-    refreshActiveEffects,
+    ensureLoaded,
     purchase,
     dismissPurchaseError,
     canAfford,

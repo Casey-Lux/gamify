@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '$lib/supabase/client';
 import { getCached, setCached } from '$lib/cache/db';
@@ -16,13 +16,14 @@ export interface AuthState {
 }
 
 function createAuthStore() {
-  const { subscribe, set, update } = writable<AuthState>({
+  const store = writable<AuthState>({
     session: null,
     profile: null,
     loading: true,
     profileFromCache: false,
     profileCachedAt: null
   });
+  const { subscribe, set, update } = store;
 
   /**
    * Network-first, cache-fallback (spec section 27: "La base de datos
@@ -60,6 +61,15 @@ function createAuthStore() {
     if (session) await loadProfile(session.user.id);
 
     supabase.auth.onAuthStateChange((_event, newSession) => {
+      // supabase-js re-emits SIGNED_IN / INITIAL_SESSION / TOKEN_REFRESHED for
+      // the SAME user (notably every time the tab regains focus). Treating
+      // those as a new login wiped the profile and made every view reload
+      // when the user merely came back to the app. Only a different user
+      // (login, logout, account switch) resets the state; the Supabase client
+      // keeps the live session and tokens itself.
+      const currentUserId = get(store).session?.user.id ?? null;
+      if (newSession && newSession.user.id === currentUserId) return;
+
       set({
         session: newSession,
         profile: null,

@@ -13,11 +13,10 @@
   let intervalId: ReturnType<typeof setInterval> | undefined;
 
   onMount(() => {
-    // Purely visual 1-second tick for the countdown text. Whether an effect
-    // is *actually* still active is always decided by Postgres (spec
-    // section 16) — the Store page separately re-fetches the active-effects
-    // list on a slower interval (see +page.svelte) to drop ones that have
-    // truly expired; this timer never talks to the server.
+    // Purely visual 1-second tick for the countdown text and for hiding
+    // effects whose time ran out. Whether an effect is *actually* still
+    // active is always decided by Postgres (spec section 16) when a reward
+    // or purchase is computed; this timer never talks to the server.
     intervalId = setInterval(() => {
       now = Date.now();
     }, 1000);
@@ -26,13 +25,15 @@
   onDestroy(() => {
     if (intervalId) clearInterval(intervalId);
   });
+
+  const visibleEffects = $derived(effects.filter((e) => new Date(e.expires_at).getTime() > now));
 </script>
 
-{#if effects.length > 0}
+{#if visibleEffects.length > 0}
   <section class="active-effects" aria-label="Efectos activos">
     <h2>Efectos activos</h2>
     <ul>
-      {#each effects as effect (effect.id)}
+      {#each visibleEffects as effect (effect.id)}
         <li>
           <span class="effect-label">
             {EFFECT_TYPE_LABEL[effect.effect_type]}

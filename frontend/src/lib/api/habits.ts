@@ -2,6 +2,7 @@ import { supabase } from '$lib/supabase/client';
 import type { CompleteMissionResult, MissionDifficulty } from '$lib/types/domain';
 import {
   ALL_WEEKDAYS,
+  HABIT_HISTORY_EDIT_DAYS,
   type Habit,
   type HabitDayPart,
   type HabitsOverview,
@@ -9,6 +10,7 @@ import {
 } from '$lib/types/habits';
 import { addDays, toLocalDateStr } from '$lib/utils/habit-schedule';
 import { lookbackStart } from '$lib/utils/habit-adaptation';
+import { invalidate } from '$lib/utils/freshness';
 
 export class HabitApiError extends Error {
   constructor(
@@ -37,6 +39,9 @@ export interface HabitInput {
   /** "Diario" checkbox. When true `days` is ignored and all 7 days are used. */
   daily: boolean;
   days: number[];
+  /** "X veces por semana" (1..7), no concrete days. null/absent = by weekdays,
+   * in which case `daily` / `days` apply as always. */
+  weeklyTarget?: number | null;
   dayPart: HabitDayPart;
   /** `HH:MM`, or '' for no reminder. */
   reminderTime: string;
@@ -67,9 +72,18 @@ export function validateHabitInput(input: HabitInput) {
       );
     }
   }
-  const days = input.daily
-    ? [...ALL_WEEKDAYS]
-    : [...new Set(input.days)].filter((d) => d >= 1 && d <= 7).sort((a, b) => a - b);
+  const weeklyTarget = input.weeklyTarget ?? null;
+  if (
+    weeklyTarget !== null &&
+    (!Number.isInteger(weeklyTarget) || weeklyTarget < 1 || weeklyTarget > 7)
+  ) {
+    throw new HabitApiError('Las veces por semana deben ser un número entero entre 1 y 7.');
+  }
+  // "X veces por semana" keeps every weekday available (no concrete days).
+  const days =
+    input.daily || weeklyTarget !== null
+      ? [...ALL_WEEKDAYS]
+      : [...new Set(input.days)].filter((d) => d >= 1 && d <= 7).sort((a, b) => a - b);
   if (days.length === 0) throw new HabitApiError('Elige al menos un día de la semana.');
   if (input.reminderTime !== '' && !/^\d{2}:\d{2}$/.test(input.reminderTime)) {
     throw new HabitApiError('La hora del recordatorio no es válida.');
@@ -78,6 +92,7 @@ export function validateHabitInput(input: HabitInput) {
     title,
     description: description.length > 0 ? description : null,
     days,
+    weeklyTarget,
     reminderTime: input.reminderTime === '' ? null : `${input.reminderTime}:00`
   };
 }
@@ -120,6 +135,7 @@ export async function createHabit(
       xp_reward: input.xpReward,
       coin_reward: input.coinReward,
       days_of_week: v.days,
+      weekly_target: v.weeklyTarget,
       // The schedule starts on the user's own local calendar day.
       schedule_effective_from: toLocalDateStr(),
       day_part: input.dayPart,
@@ -129,11 +145,12 @@ export async function createHabit(
     .select()
     .single();
   if (error) throw new HabitApiError(error.message, error.code);
+  invalidate('habits');
   return data as Habit;
 }
 
 /**
- * Edits a habit's configuration. If the weekdays changed, the new schedule
+ * Edits a habit's configuration. If the weekdays (or the weekly target) changed, the new schedule
  * takes effect TODAY (a new habit_schedule_history row is appended by a DB
  * trigger), so how past days were evaluated is never rewritten.
  */
@@ -142,6 +159,7 @@ export async function updateHabit(habit: Habit, input: HabitInput): Promise<Habi
   const sameDays =
     v.days.length === habit.days_of_week.length &&
     v.days.every((d, i) => d === [...habit.days_of_week].sort((a, b) => a - b)[i]);
+  const sameSchedule = sameDays && v.weeklyTarget === (habit.weekly_target ?? null);
 
   const { data, error } = await supabase
     .from('habits')
@@ -155,13 +173,20 @@ export async function updateHabit(habit: Habit, input: HabitInput): Promise<Habi
       day_part: input.dayPart,
       reminder_time: v.reminderTime,
       adaptive: input.adaptive,
-      ...(sameDays ? {} : { days_of_week: v.days, schedule_effective_from: toLocalDateStr() })
+      ...(sameSchedule
+        ? {}
+        : {
+            days_of_week: v.days,
+            weekly_target: v.weeklyTarget,
+            schedule_effective_from: toLocalDateStr()
+          })
     })
     .eq('id', habit.id)
     .select()
     .maybeSingle();
   if (error) throw new HabitApiError(error.message, error.code);
   if (!data) throw new HabitApiError('No se encontró el hábito o no tienes permiso para editarlo.');
+  invalidate('habits');
   return data as Habit;
 }
 
@@ -174,6 +199,7 @@ export async function setHabitArchived(habitId: string, archived: boolean): Prom
     .select('id');
   if (error) throw new HabitApiError(error.message, error.code);
   if (!data || data.length === 0) throw new HabitApiError('No se encontró el hábito.');
+  invalidate('habits');
 }
 
 const COMPLETE_ERRORS: Record<string, string> = {
@@ -184,20 +210,67 @@ const COMPLETE_ERRORS: Record<string, string> = {
   GM008: 'No se puede completar este hábito (archivado o fecha no válida).'
 };
 
+function habitRpcError(
+  error: { code?: string; message: string },
+  fallback?: Record<string, string>
+) {
+  const messages = { ...COMPLETE_ERRORS, ...fallback };
+  return new HabitApiError((error.code && messages[error.code]) || error.message, error.code);
+}
+
 export async function completeHabit(habitId: string, date: string): Promise<CompleteMissionResult> {
   const { data, error } = await supabase.rpc('complete_habit', {
     p_habit_id: habitId,
     p_date: date
   });
-  if (error) {
-    throw new HabitApiError(
-      (error.code && COMPLETE_ERRORS[error.code]) || error.message,
-      error.code
-    );
-  }
+  if (error) throw habitRpcError(error);
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new HabitApiError('complete_habit returned no result');
+  invalidate('habits', 'statistics');
   return row as CompleteMissionResult;
+}
+
+/** Messages for the history-edit RPCs (0029): same codes, different wording. */
+const EDIT_ERRORS: Record<string, string> = {
+  GM002: 'Este hábito no es tuyo.',
+  GM003: 'No hay ningún registro en esa fecha.',
+  GM004: 'Ese día ya está registrado como cumplido.',
+  GM008: `Solo se pueden editar los últimos ${HABIT_HISTORY_EDIT_DAYS} días, desde que existe el hábito y si no está archivado.`
+};
+
+/**
+ * History edit: registers a habit completion for a past day. Same economy as
+ * `completeHabit` (XP, coins, active bonuses, levels, wallet) — the reward is
+ * granted now; the server decides whether the date is editable.
+ */
+export async function backfillHabitCompletion(
+  habitId: string,
+  date: string
+): Promise<CompleteMissionResult> {
+  const { data, error } = await supabase.rpc('backfill_habit_completion', {
+    p_habit_id: habitId,
+    p_date: date
+  });
+  if (error) throw habitRpcError(error, EDIT_ERRORS);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new HabitApiError('backfill_habit_completion returned no result');
+  invalidate('habits', 'statistics');
+  return row as CompleteMissionResult;
+}
+
+/** History edit: corrects the date of an already registered completion (no reward changes). */
+export async function moveHabitCompletion(
+  habitId: string,
+  fromDate: string,
+  toDate: string
+): Promise<void> {
+  const { error } = await supabase.rpc('move_habit_completion', {
+    p_habit_id: habitId,
+    p_from: fromDate,
+    p_to: toDate
+  });
+  if (error) throw habitRpcError(error, EDIT_ERRORS);
+  invalidate('habits');
 }
 
 /** Completed occurrence dates (habit_date) per habit since `sinceDate`.
@@ -231,7 +304,7 @@ export async function fetchScheduleHistory(
 ): Promise<Record<string, ScheduleEntry[]>> {
   let query = supabase
     .from('habit_schedule_history')
-    .select('habit_id, effective_from, days_of_week');
+    .select('habit_id, effective_from, days_of_week, weekly_target');
   if (habitIds) query = query.in('habit_id', habitIds);
   const { data, error } = await query;
   if (error) throw new HabitApiError(error.message, error.code);
@@ -239,7 +312,8 @@ export async function fetchScheduleHistory(
   for (const row of (data ?? []) as (ScheduleEntry & { habit_id: string })[]) {
     (out[row.habit_id] ??= []).push({
       effective_from: row.effective_from,
-      days_of_week: row.days_of_week
+      days_of_week: row.days_of_week,
+      weekly_target: row.weekly_target ?? null
     });
   }
   return out;

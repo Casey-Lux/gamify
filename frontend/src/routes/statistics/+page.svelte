@@ -11,11 +11,8 @@
   } from '$lib/utils/statistics-aggregate';
   import { auth } from '$lib/stores/auth';
   import { skills } from '$lib/stores/catalog';
-  import { fetchHabitCompletions, fetchHabits, fetchScheduleHistory } from '$lib/api/habits';
-  import { buildHeatmap, heatmapStart } from '$lib/utils/habit-heatmap';
-  import { toLocalDateStr } from '$lib/utils/habit-schedule';
-  import type { Habit, ScheduleEntry } from '$lib/types/habits';
-  import HabitHeatmap from '$lib/components/statistics/HabitHeatmap.svelte';
+  import HabitHistoryPanel from '$lib/components/statistics/HabitHistoryPanel.svelte';
+  import SkillRadarCard from '$lib/components/statistics/SkillRadarCard.svelte';
   import ChartCanvas from '$lib/components/statistics/ChartCanvas.svelte';
   import StatSummaryCards from '$lib/components/statistics/StatSummaryCards.svelte';
   import CachedNotice from '$lib/components/layout/CachedNotice.svelte';
@@ -27,85 +24,12 @@
     { value: 'month', label: 'Mes' }
   ];
 
-  // Only one chart is shown at a time; this selector switches between ALL
-  // of them (the six original ones plus the two new ones).
-  type ChartId =
-    | 'missions'
-    | 'xp'
-    | 'coins'
-    | 'skill-activity'
-    | 'area-activity'
-    | 'skill-radar'
-    | 'xp-cumulative'
-    | 'habit-heatmap';
-
-  const CHART_OPTIONS: { id: ChartId; label: string }[] = [
-    { id: 'missions', label: 'Misiones completadas' },
-    { id: 'xp', label: 'XP ganada' },
-    { id: 'coins', label: 'Monedas ganadas / gastadas' },
-    { id: 'skill-activity', label: 'Actividad por skill' },
-    { id: 'area-activity', label: 'Actividad por área' },
-    { id: 'skill-radar', label: 'Nivel por skill' },
-    { id: 'xp-cumulative', label: 'XP acumulada' },
-    { id: 'habit-heatmap', label: 'Cumplimiento de hábitos' }
-  ];
-
-  let selectedChart = $state<ChartId>('missions');
   /** 'all' = XP general, otherwise a skill id. */
   let xpScope = $state<string>('all');
 
-  // Habit heatmap data (own window, independent of the día/semana/mes toggle).
-  const HEATMAP_WEEKS = 26;
-  let habits = $state<Habit[]>([]);
-  let habitsLoaded = $state(false);
-  let heatmapHabitId = $state('');
-  let heatmapSchedule = $state<ScheduleEntry[]>([]);
-  let heatmapCompleted = $state<string[]>([]);
-  let heatmapLoading = $state(false);
-  let heatmapError = $state<string | null>(null);
-  let heatmapToken = 0;
-
   onMount(() => {
-    void statisticsStore.load('day');
+    void statisticsStore.ensureLoaded();
   });
-
-  $effect(() => {
-    if (selectedChart !== 'habit-heatmap' || habitsLoaded) return;
-    void fetchHabits()
-      .then((list) => {
-        habits = list;
-        if (!heatmapHabitId) {
-          heatmapHabitId = (list.find((h) => h.archived_at === null) ?? list[0])?.id ?? '';
-        }
-      })
-      .catch(() => (heatmapError = 'No se pudieron cargar los hábitos.'))
-      .finally(() => (habitsLoaded = true));
-  });
-
-  $effect(() => {
-    const habitId = heatmapHabitId;
-    if (selectedChart !== 'habit-heatmap' || !habitId) return;
-    const token = ++heatmapToken;
-    heatmapLoading = true;
-    heatmapError = null;
-    const since = heatmapStart(toLocalDateStr(), HEATMAP_WEEKS);
-    void Promise.all([fetchScheduleHistory([habitId]), fetchHabitCompletions(since, habitId)])
-      .then(([schedules, completed]) => {
-        if (token !== heatmapToken) return;
-        heatmapSchedule = schedules[habitId] ?? [];
-        heatmapCompleted = completed[habitId] ?? [];
-      })
-      .catch(() => {
-        if (token === heatmapToken) heatmapError = 'No se pudo cargar el cumplimiento del hábito.';
-      })
-      .finally(() => {
-        if (token === heatmapToken) heatmapLoading = false;
-      });
-  });
-
-  const heatmap = $derived(
-    buildHeatmap(toLocalDateStr(), HEATMAP_WEEKS, heatmapSchedule, heatmapCompleted)
-  );
 
   const buckets = $derived(generateBuckets($statisticsStore.granularity));
   const bucketLabels = $derived(buckets.map((b) => b.label));
@@ -234,26 +158,6 @@
     }
   });
 
-  const skillRadarChartConfig = $derived<ChartConfiguration>({
-    type: 'radar',
-    data: {
-      labels: $statisticsStore.skillProgress.map((s) => s.skill_name),
-      datasets: [
-        {
-          label: 'Nivel por skill',
-          data: $statisticsStore.skillProgress.map((s) => s.level),
-          borderColor: '#4c6ef5',
-          backgroundColor: '#4c6ef533'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
-  });
-
   // Accumulated XP. Baseline = XP held right now minus what the loaded window
   // contributed, i.e. everything earned before the first bucket (the totals
   // come from profiles.total_xp / player_skills.xp, never recomputed).
@@ -298,12 +202,7 @@
 <main class="statistics-page">
   <header class="statistics-page__header">
     <h1>Estadísticas</h1>
-    <div
-      class="granularity-toggle"
-      role="group"
-      aria-label="Agrupar por"
-      hidden={selectedChart === 'habit-heatmap'}
-    >
+    <div class="granularity-toggle" role="group" aria-label="Agrupar por">
       {#each GRANULARITIES as g (g.value)}
         <button
           type="button"
@@ -327,80 +226,36 @@
 
     <StatSummaryCards {missionsCompleted} {xpAccumulated} />
 
-    <div class="chart-controls">
-      <label>
-        Estadística
-        <select bind:value={selectedChart}>
-          {#each CHART_OPTIONS as option (option.id)}
-            <option value={option.id}>{option.label}</option>
-          {/each}
-        </select>
-      </label>
+    <SkillRadarCard skills={$statisticsStore.skillProgress} />
 
-      {#if selectedChart === 'xp-cumulative'}
-        <label>
-          XP de
-          <select bind:value={xpScope}>
-            <option value="all">General</option>
-            {#each $skills as skill (skill.id)}
-              <option value={skill.id}>{skill.name}</option>
-            {/each}
-          </select>
-        </label>
-      {:else if selectedChart === 'habit-heatmap' && habits.length > 0}
-        <label>
-          Hábito
-          <select bind:value={heatmapHabitId}>
-            {#each habits as habit (habit.id)}
-              <option value={habit.id}>
-                {habit.title}{habit.archived_at ? ' (archivado)' : ''}
-              </option>
-            {/each}
-          </select>
-        </label>
-      {/if}
+    <div class="charts">
+      <ChartCanvas title="Misiones completadas" config={missionsChartConfig} />
+      <ChartCanvas title="XP ganada" config={xpChartConfig} />
+      <ChartCanvas title="Monedas ganadas / gastadas" config={coinsChartConfig} />
+      <ChartCanvas title={xpScopeLabel} config={xpCumulativeChartConfig}>
+        {#snippet controls()}
+          <label class="scope">
+            XP de
+            <select bind:value={xpScope}>
+              <option value="all">General</option>
+              {#each $skills as skill (skill.id)}
+                <option value={skill.id}>{skill.name}</option>
+              {/each}
+            </select>
+          </label>
+        {/snippet}
+      </ChartCanvas>
+      <ChartCanvas title="Actividad por skill" config={skillActivityChartConfig} />
+      <ChartCanvas title="Actividad por área" config={areaActivityChartConfig} />
     </div>
 
-    <div class="chart-stage">
-      {#if selectedChart === 'habit-heatmap'}
-        {#if heatmapError}
-          <p class="error" role="alert">{heatmapError}</p>
-        {:else if !habitsLoaded}
-          <p class="status">Cargando hábitos…</p>
-        {:else if habits.length === 0}
-          <p class="status">Todavía no tienes hábitos. Crea uno en la sección Hábitos.</p>
-        {:else if heatmapLoading}
-          <p class="status">Cargando cumplimiento…</p>
-        {:else}
-          <HabitHeatmap title="Cumplimiento de hábitos" {heatmap} />
-        {/if}
-      {:else}
-        <!-- {#key}: a new Chart.js instance per selection (chart types differ). -->
-        {#key `${selectedChart}:${xpScope}`}
-          {#if selectedChart === 'missions'}
-            <ChartCanvas title="Misiones completadas" config={missionsChartConfig} />
-          {:else if selectedChart === 'xp'}
-            <ChartCanvas title="XP ganada" config={xpChartConfig} />
-          {:else if selectedChart === 'coins'}
-            <ChartCanvas title="Monedas ganadas / gastadas" config={coinsChartConfig} />
-          {:else if selectedChart === 'skill-activity'}
-            <ChartCanvas title="Actividad por skill" config={skillActivityChartConfig} />
-          {:else if selectedChart === 'area-activity'}
-            <ChartCanvas title="Actividad por área" config={areaActivityChartConfig} />
-          {:else if selectedChart === 'skill-radar'}
-            <ChartCanvas title="Nivel por skill" config={skillRadarChartConfig} />
-          {:else if selectedChart === 'xp-cumulative'}
-            <ChartCanvas title={xpScopeLabel} config={xpCumulativeChartConfig} />
-          {/if}
-        {/key}
-      {/if}
-    </div>
+    <HabitHistoryPanel />
   {/if}
 </main>
 
 <style>
   .statistics-page {
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 1rem;
     padding-bottom: 5rem;
@@ -442,24 +297,20 @@
   .error {
     color: #e0574f;
   }
-  .granularity-toggle[hidden] {
-    display: none;
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
   }
-  .chart-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-  .chart-controls label {
+  .scope {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     font-size: 0.85rem;
-    min-width: 200px;
   }
-  .chart-controls select {
-    min-height: 44px;
-    padding: 0.5rem;
+  .scope select {
+    min-height: 40px;
+    padding: 0.4rem;
     border-radius: 0.4rem;
     border: 1px solid var(--border, #2c2c3a);
     background: var(--input-bg, #14141f);
@@ -467,7 +318,9 @@
     font-family: inherit;
     color-scheme: dark;
   }
-  .chart-stage {
-    min-width: 0;
+  @media (max-width: 860px) {
+    .charts {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

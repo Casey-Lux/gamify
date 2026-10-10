@@ -22,6 +22,7 @@ function habit(patch: Partial<Habit> = {}): Habit {
     xp_reward: 10,
     coin_reward: 5,
     days_of_week: [1, 2, 3, 4, 5, 6, 7],
+    weekly_target: null,
     schedule_effective_from: '2026-01-01',
     day_part: 'ANYTIME',
     reminder_time: null,

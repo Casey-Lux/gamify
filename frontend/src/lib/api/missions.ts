@@ -9,6 +9,7 @@ import type {
 } from '$lib/types/domain';
 import { MISSION_PAGE_SIZE, type MissionFilters, type MissionSort } from '$lib/types/mission-query';
 import { buildDueValue, startOfLocalDay } from '$lib/utils/due-date';
+import { invalidate } from '$lib/utils/freshness';
 
 export class MissionApiError extends Error {
   constructor(
@@ -91,14 +92,6 @@ export function applyFilters(query: any, filters: MissionFilters, now: number = 
   if (filters.skillId) query = query.eq('skill_id', filters.skillId);
   if (filters.difficulty) query = query.eq('difficulty', filters.difficulty);
 
-  if (filters.dueAfter) query = query.gte('due_at', filters.dueAfter);
-  if (filters.dueBefore) query = query.lte('due_at', filters.dueBefore);
-
-  if (filters.xpMin !== null) query = query.gte('xp_reward', filters.xpMin);
-  if (filters.xpMax !== null) query = query.lte('xp_reward', filters.xpMax);
-  if (filters.coinsMin !== null) query = query.gte('coin_reward', filters.coinsMin);
-  if (filters.coinsMax !== null) query = query.lte('coin_reward', filters.coinsMax);
-
   if (filters.search.trim().length > 0) {
     query = query.ilike('title', `%${filters.search.trim()}%`);
   }
@@ -164,6 +157,7 @@ export async function completeMission(missionId: string): Promise<CompleteMissio
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new MissionApiError('complete_mission returned no result');
 
+  invalidate('missions', 'statistics');
   return row as CompleteMissionResult;
 }
 
@@ -180,6 +174,7 @@ export async function setSubtaskCompleted(
     .single();
 
   if (error) throw new MissionApiError(error.message, error.code);
+  invalidate('missions');
   return data as MissionSubtask;
 }
 
@@ -300,6 +295,8 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
 
   if (error) throw new MissionApiError(error.message, error.code);
   const mission = data as Mission;
+  // The mission exists from here on, even if its subtasks fail below.
+  invalidate('missions');
 
   if (subtaskTitles.length > 0) {
     const rows = subtaskTitles.map((subtaskTitle, index) => ({
@@ -396,6 +393,7 @@ export async function updateMission(input: UpdateMissionInput): Promise<Mission>
     throw new MissionApiError('No se encontró la misión o no tienes permiso para editarla.');
 
   const subtaskError = await syncSubtasks(input.missionId, input.subtasks);
+  invalidate('missions');
   if (subtaskError) {
     throw new MissionApiError(
       `La misión se guardó, pero las submisiones no se pudieron actualizar: ${subtaskError.message}`,
@@ -470,4 +468,5 @@ export async function deleteMission(missionId: string): Promise<void> {
   if (!data || data.length === 0) {
     throw new MissionApiError('No se encontró la misión o no tienes permiso para eliminarla.');
   }
+  invalidate('missions');
 }

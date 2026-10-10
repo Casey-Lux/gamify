@@ -22,8 +22,10 @@
   let completionError = $state<string | null>(null);
   let lastReward = $state<{ xp: number; coins: number; leveledUp: boolean } | null>(null);
 
+  // Opening the view only queries if nothing is loaded yet or a mutation
+  // invalidated the list; coming back to the app never refetches by itself.
   onMount(() => {
-    void missionsStore.load();
+    void missionsStore.ensureLoaded();
   });
 
   async function handleComplete(missionId: string) {
@@ -40,6 +42,9 @@
     } catch (err) {
       completionError =
         err instanceof MissionApiError ? err.message : 'No se pudo completar la misión.';
+      // The database refused (e.g. already completed elsewhere, subtasks
+      // changed): show the real state instead of the stale one.
+      void missionsStore.load();
     } finally {
       completingId = null;
     }
@@ -63,6 +68,7 @@
     } catch (err) {
       completionError =
         err instanceof MissionApiError ? err.message : 'No se pudo eliminar la misión.';
+      void missionsStore.load();
     } finally {
       deletingId = null;
     }
@@ -75,6 +81,7 @@
     } catch (err) {
       completionError =
         err instanceof MissionApiError ? err.message : 'No se pudo actualizar la submisión.';
+      void missionsStore.load();
     }
   }
 

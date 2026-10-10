@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
   import { storeStore } from '$lib/stores/store';
   import { workspaceStore } from '$lib/stores/workspace';
   import { auth } from '$lib/stores/auth';
@@ -7,22 +6,14 @@
   import ActiveEffectsList from '$lib/components/store/ActiveEffectsList.svelte';
 
   let lastPurchase = $state<{ itemName: string } | null>(null);
-  let refreshIntervalId: ReturnType<typeof setInterval> | undefined;
 
   const workspaceId = $derived($workspaceStore.activeWorkspaceId);
 
-  onMount(() => {
-    // Slow background refresh so effects that expired since the last load
-    // drop off the list even if the user doesn't purchase anything else.
-    refreshIntervalId = setInterval(() => void storeStore.refreshActiveEffects(), 30_000);
-  });
-
-  onDestroy(() => {
-    if (refreshIntervalId) clearInterval(refreshIntervalId);
-  });
-
+  // Opening the view only queries if nothing was loaded yet (or a purchase /
+  // new item invalidated it); there is no background polling. Effects that
+  // expire while the page is open are dropped locally by ActiveEffectsList.
   $effect(() => {
-    if (workspaceId) void storeStore.load(workspaceId);
+    if (workspaceId) void storeStore.ensureLoaded(workspaceId);
   });
 
   async function handlePurchase(itemId: string) {
@@ -32,6 +23,11 @@
     const result = await storeStore.purchase(itemId, workspaceId);
     if (result && item) {
       lastPurchase = { itemName: item.name };
+      await auth.refreshProfile();
+    } else if (!result) {
+      // The database refused the purchase (e.g. another session already spent
+      // the coins): the balance on screen is stale, so show the real one. The
+      // store itself already re-fetched stock and prices.
       await auth.refreshProfile();
     }
   }

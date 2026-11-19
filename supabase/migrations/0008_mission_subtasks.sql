@@ -1,8 +1,3 @@
--- =============================================================================
--- 0008_mission_subtasks.sql
--- spec section 10 "Submisiones"
--- =============================================================================
-
 create table public.mission_subtasks (
   id           uuid primary key default gen_random_uuid(),
   mission_id   uuid not null references public.missions (id) on delete cascade,
@@ -31,9 +26,6 @@ create trigger mission_subtasks_set_updated_at
 before update on public.mission_subtasks
 for each row execute function public.set_updated_at();
 
--- Keep completed_at consistent automatically rather than trusting the client
--- to send a matching timestamp: this is a small UX/data-quality nicety, not a
--- security boundary (the security boundary is complete_mission's own re-check).
 create or replace function public.mission_subtasks_sync_completed_at()
 returns trigger
 language plpgsql

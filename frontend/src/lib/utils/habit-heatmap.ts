@@ -1,15 +1,6 @@
 import type { ScheduleEntry } from '$lib/types/habits';
 import { addDays, entryInForce, isoWeekday, isScheduledOn } from './habit-schedule';
 
-/**
- * - done:    completed that day (even if it was not a scheduled day)
- * - missed:  scheduled, already over, not completed
- * - pending: scheduled today, not completed yet
- * - off:     not scheduled (or before the habit existed). Also every day that
- *            was not completed under an "X veces por semana" schedule: those
- *            habits have no concrete days, their goal is judged per week.
- * - future:  after today
- */
 export type HeatmapState = 'done' | 'missed' | 'pending' | 'off' | 'future';
 
 export interface HeatmapCell {
@@ -18,17 +9,14 @@ export interface HeatmapCell {
 }
 
 export interface Heatmap {
-  /** One column per week (oldest first); each has 7 cells, Monday..Sunday. */
   weeks: HeatmapCell[][];
-  /** Scheduled days up to today (today included) and how many were completed. */
+
   scheduled: number;
   completed: number;
-  /** 'weekly' when some week was judged against an "X veces por semana" goal: then
-   * `scheduled` / `completed` count weekly goals' completions, not days. */
+
   mode: 'days' | 'weekly';
 }
 
-/** First date shown: the Monday of the week that is `weeks - 1` weeks before today's. */
 export function heatmapStart(today: string, weeks: number): string {
   const monday = addDays(today, -(isoWeekday(today) - 1));
   return addDays(monday, -(weeks - 1) * 7);
@@ -49,7 +37,7 @@ export function buildHeatmap(
 
   for (let w = 0; w < weeks; w++) {
     const column: HeatmapCell[] = [];
-    // "X veces por semana": goal of this column's week and what was done.
+
     let weekTarget: number | null = null;
     let weekDone = 0;
     for (let d = 0; d < 7; d++) {

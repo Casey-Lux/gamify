@@ -14,12 +14,11 @@ describe('generateBuckets', () => {
   });
 
   it('generates 12 weekly buckets aligned to Monday', () => {
-    // 2026-01-31 is a Saturday.
     const now = new Date('2026-01-31T00:00:00.000Z');
     const buckets = generateBuckets('week', now);
     expect(buckets).toHaveLength(12);
     for (const bucket of buckets) {
-      expect(bucket.start.getUTCDay()).toBe(1); // Monday
+      expect(bucket.start.getUTCDay()).toBe(1);
       const spanMs = bucket.end.getTime() - bucket.start.getTime();
       expect(spanMs).toBe(7 * 24 * 60 * 60 * 1000);
     }

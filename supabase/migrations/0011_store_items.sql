@@ -1,8 +1,3 @@
--- =============================================================================
--- 0011_store_items.sql
--- spec section 14 "Tienda" + section 15 "Efectos"
--- =============================================================================
-
 create table public.store_items (
   id               uuid primary key default gen_random_uuid(),
   workspace_id     uuid not null references public.workspaces (id) on delete cascade,
@@ -22,9 +17,7 @@ create table public.store_items (
   constraint store_items_price_non_negative check (price >= 0),
   constraint store_items_stock_non_negative check (stock >= 0),
   constraint store_items_stock_within_max check (stock <= max_stock),
-  -- "max_stock = 5 en MVP" (spec section 14/45) — every item type is capped the
-  -- same way; the column still exists (rather than a hardcoded literal) so a
-  -- future MVP+ change is a data/config change, not a schema change.
+
   constraint store_items_max_stock_is_five check (max_stock = 5),
   constraint store_items_duration_range check (duration_minutes between 1 and 30),
   constraint store_items_effect_value_positive check (effect_value > 0)

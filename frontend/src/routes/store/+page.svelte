@@ -9,9 +9,6 @@
 
   const workspaceId = $derived($workspaceStore.activeWorkspaceId);
 
-  // Opening the view only queries if nothing was loaded yet (or a purchase /
-  // new item invalidated it); there is no background polling. Effects that
-  // expire while the page is open are dropped locally by ActiveEffectsList.
   $effect(() => {
     if (workspaceId) void storeStore.ensureLoaded(workspaceId);
   });
@@ -25,9 +22,6 @@
       lastPurchase = { itemName: item.name };
       await auth.refreshProfile();
     } else if (!result) {
-      // The database refused the purchase (e.g. another session already spent
-      // the coins): the balance on screen is stale, so show the real one. The
-      // store itself already re-fetched stock and prices.
       await auth.refreshProfile();
     }
   }

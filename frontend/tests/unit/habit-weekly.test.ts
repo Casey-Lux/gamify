@@ -12,7 +12,6 @@ import {
 import { invalidate, onInvalidate, versionOf } from '../../src/lib/utils/freshness';
 import type { Habit, ScheduleEntry } from '../../src/lib/types/habits';
 
-// 2026-10-05 is a Monday.
 const MON = '2026-10-05';
 const WED = '2026-10-07';
 const THU = '2026-10-08';
@@ -44,7 +43,6 @@ describe('planWeekly', () => {
   });
 
   it('prefers the weekdays the user usually completes', () => {
-    // Completed on Tuesdays and Thursdays in previous weeks.
     const history = ['2026-09-29', '2026-10-01', '2026-09-22', '2026-09-24'];
     const plan = planWeekly({ ...base, target: 2, completedDates: history, today: MON });
     expect(plan.plannedDates).toEqual(['2026-10-06', THU]);
@@ -56,7 +54,7 @@ describe('planWeekly', () => {
       ...base,
       target: 3,
       completedDates: [MON],
-      today: '2026-10-10' // Saturday: 2 left, 2 days remain
+      today: '2026-10-10'
     });
     expect(plan.plannedDates).toEqual(['2026-10-10', SUN]);
     expect(plan.progress.urgent).toBe(true);
@@ -102,7 +100,7 @@ describe('planWeekly', () => {
       today: MON
     });
     expect(plan.progress.done).toBe(0);
-    // Last week's weekend completions only inform WHICH day is preferred.
+
     expect(plan.plannedDates).toEqual(['2026-10-10']);
   });
 });
@@ -135,7 +133,7 @@ describe('weekly schedule integration', () => {
   it('heatmap judges a weekly habit per week', () => {
     const h = buildHeatmap(THU, 2, WEEKLY3, [MON, WED]);
     expect(h.mode).toBe('weekly');
-    expect(h.scheduled).toBe(6); // 2 weeks x 3
+    expect(h.scheduled).toBe(6);
     expect(h.completed).toBe(2);
     const flat = h.weeks.flat();
     expect(flat.find((c) => c.date === MON)?.state).toBe('done');

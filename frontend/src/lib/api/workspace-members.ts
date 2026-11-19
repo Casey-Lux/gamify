@@ -12,14 +12,6 @@ export interface WorkspaceMemberOption {
   displayName: string;
 }
 
-/**
- * Only used to populate the "asignar a" picker on the mission-creation form
- * for an OWNER (spec section 4: a MEMBER may only assign missions to
- * themselves, so this is never called for a MEMBER). Readable by any member
- * of the workspace per `workspace_members_select` / `profiles_select`
- * (0016_rls_policies.sql) — the OWNER-only restriction here is a UI choice,
- * not an RLS one.
- */
 export async function fetchWorkspaceMembers(workspaceId: string): Promise<WorkspaceMemberOption[]> {
   const { data, error } = await supabase
     .from('workspace_members')

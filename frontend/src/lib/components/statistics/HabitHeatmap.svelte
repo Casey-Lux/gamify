@@ -5,7 +5,7 @@
   interface Props {
     title: string;
     heatmap: Heatmap;
-    /** When set, days become buttons that select a date to edit its record. */
+
     onSelect?: (date: string) => void;
     selectedDate?: string | null;
   }

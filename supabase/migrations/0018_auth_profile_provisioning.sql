@@ -1,13 +1,3 @@
--- =============================================================================
--- 0018_auth_profile_provisioning.sql
--- Fase 3 "Auth, profiles, workspaces, memberships"
--- spec section 5 + criterio de aceptación "obtiene automáticamente un perfil"
--- =============================================================================
--- SECURITY DEFINER so it can INSERT into public.profiles regardless of the
--- (deliberately very restrictive, see 0015_column_privileges.sql) privileges
--- granted to ordinary client roles — it runs as the function's owner, which
--- has full table-owner rights and bypasses RLS.
-
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -32,21 +22,6 @@ begin
   values (new.id, v_display_name)
   on conflict (id) do nothing;
 
-  -- Spec section 4: "Un usuario puede tener un workspace personal" — every
-  -- newly registered user gets exactly one, automatically, the same way
-  -- they automatically get a profile. This was originally left for the
-  -- client to request via create_workspace() (0019), but nothing in the
-  -- frontend ever called it: a freshly registered user would authenticate
-  -- successfully yet have zero workspace_members rows, and every screen
-  -- that depends on an active workspace (Missions, Store, Statistics,
-  -- catalog) would stay permanently empty with no path to recover short of
-  -- an admin manually inserting rows. Folding it into this same
-  -- SECURITY DEFINER trigger — instead of a second round-trip from the
-  -- client after signUp() — makes "has a personal workspace" as
-  -- unconditionally true as "has a profile" already was, and keeps both
-  -- provisioned atomically in the same transaction as the auth.users row
-  -- itself. create_workspace() (0019) remains available and unchanged for
-  -- creating *additional* (organization) workspaces later.
   insert into public.workspaces (name, is_personal, created_by)
   values (v_display_name, true, new.id)
   returning * into v_workspace;

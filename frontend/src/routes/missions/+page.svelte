@@ -22,8 +22,6 @@
   let completionError = $state<string | null>(null);
   let lastReward = $state<{ xp: number; coins: number; leveledUp: boolean } | null>(null);
 
-  // Opening the view only queries if nothing is loaded yet or a mutation
-  // invalidated the list; coming back to the app never refetches by itself.
   onMount(() => {
     void missionsStore.ensureLoaded();
   });
@@ -42,8 +40,7 @@
     } catch (err) {
       completionError =
         err instanceof MissionApiError ? err.message : 'No se pudo completar la misión.';
-      // The database refused (e.g. already completed elsewhere, subtasks
-      // changed): show the real state instead of the stale one.
+
       void missionsStore.load();
     } finally {
       completingId = null;
@@ -61,7 +58,7 @@
     try {
       await deleteMission(mission.id);
       await missionsStore.load();
-      // Deleting the last row of a page leaves it empty: step back one page.
+
       if ($missionsStore.missions.length === 0 && $missionsStore.page > 0) {
         missionsStore.previousPage();
       }
@@ -112,9 +109,6 @@
     onClearOne={missionsStore.clearFilter}
   />
 
-  <!-- Total rows matching the current search + filters (server-side count,
-       not just the current page). Hidden while a new query is loading so a
-       stale number is never shown next to new criteria. -->
   <p class="results-count" role="status" aria-live="polite">
     {#if !$missionsStore.error && !$missionsStore.loading}
       {$missionsStore.totalCount}

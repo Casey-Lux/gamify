@@ -14,25 +14,6 @@ import {
 } from './habit-schedule';
 import { planWeekly } from './habit-weekly';
 
-/**
- * Adaptive planning — first version, deliberately simple and explainable.
- *
- * For each weekday we look at the last `windowWeeks` weeks and count, among
- * the days the habit was SCHEDULED (according to its schedule history, never
- * according to previous adaptations), how many were actually completed.
- *
- *   - fewer than `minSamples` scheduled days  -> REQUIRED (not enough evidence)
- *   - rate >= `reminderBelowRate`             -> REQUIRED
- *   - rate between the two thresholds         -> REMINDER (still required, with
- *                                                a special reminder)
- *   - rate <= `optionalAtOrBelowRate` and at least `optionalMinSamples`
- *     scheduled days                          -> OPTIONAL (not required)
- *
- * The result is DERIVED on the fly: it never edits `days_of_week` or any
- * stored history, so it is fully reversible (if the user starts doing that
- * day again the rate rises and the day becomes required again) and the
- * thresholds can be tuned here in one place.
- */
 export const ADAPTATION_CONFIG = {
   windowWeeks: 8,
   minSamples: 4,
@@ -61,8 +42,6 @@ export function planFromStats(
   return 'REQUIRED';
 }
 
-/** Per-weekday stats over the lookback window, ending YESTERDAY (today is not
- * over yet, so it never counts as a miss). Index 0 = Monday ... 6 = Sunday. */
 export function computeWeekdayStats(
   schedule: ScheduleEntry[],
   completedDates: Iterable<string>,
@@ -105,10 +84,10 @@ export function computeWeekdayStats(
 export interface HabitDayInfo {
   scheduledToday: boolean;
   doneToday: boolean;
-  /** Plan for today's weekday; always REQUIRED when the habit is not adaptive. */
+
   plan: WeekdayPlan;
   stat: WeekdayStat;
-  /** Set only for "X veces por semana" habits: this week's progress. */
+
   weekly?: WeeklyProgress | null;
 }
 
@@ -119,9 +98,6 @@ export function habitDayInfo(
   today: string,
   config: AdaptationConfig = ADAPTATION_CONFIG
 ): HabitDayInfo {
-  // "X veces por semana": there are no concrete weekdays to adapt, so the
-  // days that "tocan" come from this week's progress instead (habit-weekly.ts),
-  // learning the user's usual weekdays from the same lookback window.
   const weeklyTarget = weeklyTargetInForce(schedule, today);
   if (weeklyTarget !== null) {
     const weekly = planWeekly({

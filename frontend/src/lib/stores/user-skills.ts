@@ -8,18 +8,11 @@ const CACHE_KEY = 'current';
 export interface UserSkillsState {
   skills: SkillProgress[];
   loading: boolean;
-  /** True when `skills` came from the IndexedDB cache (spec section 27) —
-   * keeps the User Card showing something on the Missions/Profile pages
-   * instead of going blank the moment the network read fails. */
+
   fromCache: boolean;
   cachedAt: string | null;
 }
 
-/**
- * Reuses `fetchSkillProgress` (built for the Fase 9 radar chart) rather
- * than duplicating a "current level per skill" query — both need exactly
- * the same rows (player_skills joined to skills.name).
- */
 function createUserSkillsStore() {
   const { subscribe, set, update } = writable<UserSkillsState>({
     skills: [],

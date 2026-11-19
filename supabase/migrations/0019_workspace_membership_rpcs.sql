@@ -1,22 +1,3 @@
--- =============================================================================
--- 0019_workspace_membership_rpcs.sql
--- Fase 3 "Auth, profiles, workspaces, memberships"
--- spec section 4: OWNER "gestiona miembros"; section 31: "un miembro no puede
--- convertirse a OWNER mediante una operación cliente normal".
---
--- Documented secondary decision: adding a member happens by email lookup of
--- an existing, already-registered user (no invite-link/email-delivery system).
--- The spec does not describe an invite flow and explicitly asks to avoid
--- external email providers (section 51), so this is the simplest mechanism
--- that satisfies "OWNER gestiona miembros" without adding infrastructure.
--- If a real invite-by-email-link flow is wanted later, it is an additive
--- change (a new table + RPC), not a redesign of what exists here.
--- =============================================================================
-
--- ---------------------------------------------------------------------------
--- create_workspace: creates the workspace row and its first OWNER membership
--- atomically, so a workspace can never exist without exactly one owner.
--- ---------------------------------------------------------------------------
 create or replace function public.create_workspace(
   p_name text,
   p_is_personal boolean default false
@@ -54,11 +35,6 @@ comment on function public.create_workspace(text, boolean) is
   'p_is_personal=true is rejected if the user already has a personal '
   'workspace (enforced by workspaces_one_personal_per_creator_idx).';
 
--- ---------------------------------------------------------------------------
--- add_workspace_member: OWNER-only. Looks up an existing user by email
--- (auth.users is never exposed to the client directly) and adds them as
--- MEMBER. Cannot be used to add someone as OWNER — see spec section 31.
--- ---------------------------------------------------------------------------
 create or replace function public.add_workspace_member(
   p_workspace_id uuid,
   p_email text
@@ -113,10 +89,6 @@ comment on function public.add_workspace_member(uuid, text) is
   'OWNER-only. Adds an already-registered user as MEMBER by email. Never '
   'grants OWNER — role escalation only happens via update_workspace_member_role.';
 
--- ---------------------------------------------------------------------------
--- update_workspace_member_role: OWNER-only. Promote/demote, but a workspace
--- must always keep at least one OWNER.
--- ---------------------------------------------------------------------------
 create or replace function public.update_workspace_member_role(
   p_workspace_id uuid,
   p_user_id uuid,
@@ -145,8 +117,6 @@ begin
     raise exception 'only a workspace OWNER can change member roles' using errcode = '42501';
   end if;
 
-  -- Lock the target row so two concurrent demotions of different owners
-  -- can't both pass the "count > 1" check and leave zero owners behind.
   select * into v_member
   from public.workspace_members
   where workspace_id = p_workspace_id and user_id = p_user_id
@@ -176,11 +146,6 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------------------
--- remove_workspace_member: an OWNER may remove anyone; a MEMBER may remove
--- only themselves (leave workspace). A workspace must always keep at least
--- one OWNER.
--- ---------------------------------------------------------------------------
 create or replace function public.remove_workspace_member(
   p_workspace_id uuid,
   p_user_id uuid
@@ -233,9 +198,6 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------------------
--- Privileges: authenticated may call these RPCs; nobody may call them as anon.
--- ---------------------------------------------------------------------------
 revoke all on function public.create_workspace(text, boolean) from public;
 revoke all on function public.add_workspace_member(uuid, text) from public;
 revoke all on function public.update_workspace_member_role(uuid, uuid, public.workspace_role) from public;

@@ -19,9 +19,6 @@
 
   const HEATMAP_WEEKS = 26;
 
-  // In-memory cache shared by every visit to this panel: coming back to the
-  // Statistics view does not refetch; any habit mutation (utils/freshness.ts)
-  // makes it stale.
   interface HabitData {
     version: number;
     schedule: ScheduleEntry[];
@@ -123,8 +120,6 @@
     actionError = null;
   }
 
-  /** Runs one history edit. The database validates it (window, duplicates,
-   * ownership); on a refusal we refetch the real state of this habit. */
   async function run(action: () => Promise<unknown>, success: string, refreshEconomy: boolean) {
     if (!habit || busy) return;
     busy = true;

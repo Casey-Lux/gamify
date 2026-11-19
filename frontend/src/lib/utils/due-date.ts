@@ -1,17 +1,6 @@
-/**
- * Mission deadline helpers. A deadline is either
- *   - a date only  (dueHasTime = false): the user picked a day and NO time —
- *     `due_at` holds that day's local midnight purely as a sortable anchor,
- *     and the app never displays or assumes a time for it; or
- *   - a date + time (dueHasTime = true): an exact instant.
- * Everything here works in the browser's local time zone, because that is
- * what the calendar / time inputs show the user.
- */
-
 export interface DueParts {
-  /** `YYYY-MM-DD` (the value of an `<input type="date">`), or ''. */
   date: string;
-  /** `HH:MM` (the value of an `<input type="time">`), or ''. */
+
   time: string;
 }
 
@@ -27,17 +16,11 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-/** Local midnight of the day containing `ms`. */
 export function startOfLocalDay(ms: number): number {
   const d = new Date(ms);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/**
- * Form inputs -> the two values persisted in Supabase. Returns `null` due_at
- * for "sin fecha límite". A time without a date is rejected (there is no
- * sensible reading of it); a date without a time stays date-only.
- */
 export function buildDueValue(date: string, time: string): DueValue {
   const d = date.trim();
   const t = time.trim();
@@ -68,7 +51,6 @@ export function buildDueValue(date: string, time: string): DueValue {
   return { dueAt: local.toISOString(), dueHasTime: true };
 }
 
-/** Persisted values -> form inputs (inverse of buildDueValue). */
 export function splitDueValue(dueAt: string | null, dueHasTime: boolean): DueParts {
   if (!dueAt) return { date: '', time: '' };
   const d = new Date(dueAt);
@@ -76,13 +58,6 @@ export function splitDueValue(dueAt: string | null, dueHasTime: boolean): DuePar
   return { date, time: dueHasTime ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '' };
 }
 
-/**
- * "Vencida" rule.
- *  - exact deadline: overdue as soon as that instant has passed;
- *  - date-only deadline: overdue only once the whole day has passed
- *    (i.e. from local midnight of the following day), since no time was chosen.
- * Completed missions and missions without a deadline are never overdue.
- */
 export function isDueOverdue(
   dueAt: string | null,
   completedAt: string | null,

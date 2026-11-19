@@ -1,10 +1,3 @@
--- =============================================================================
--- 0003_helper_functions.sql
--- Small, reusable, deterministic helper functions shared across tables.
--- =============================================================================
-
--- Generic "touch updated_at on write" trigger function, reused by every table
--- that has an updated_at column, so the rule is defined exactly once.
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql

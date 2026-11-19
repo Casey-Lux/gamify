@@ -1,27 +1,12 @@
 #!/usr/bin/env bash
-# =============================================================================
-# supabase/tests/concurrency_test.sh
-# Fase 12 — spec sección 44 "Database tests": completado simultáneo, compra
-# simultánea (carrera de fondos insuficientes).
-#
-# A single PL/pgSQL transaction can't simulate two requests racing each
-# other — it's one session, executed serially. This launches real, separate
-# `psql` OS processes in parallel against the SAME already-migrated
-# database, each its own connection/transaction, which is the only way to
-# genuinely exercise the `for update` row locks in complete_mission/
-# purchase_item (0023/0024) under real concurrent load.
-#
-# Called by run_db_tests.sh with TEST_DB already set; can also be run
-# directly against an existing, already-migrated database:
-#   TEST_DB=gamify_test supabase/tests/concurrency_test.sh
-# =============================================================================
+
 set -euo pipefail
 
 TEST_DB="${TEST_DB:-gamify_test}"
 N=10
 
-USER_A="00000000-0000-0000-0000-0000000000e1"   # completes the same mission N times in parallel
-USER_B="00000000-0000-0000-0000-0000000000e2"   # buys the same item N times in parallel, funds for only 4
+USER_A="00000000-0000-0000-0000-0000000000e1"
+USER_B="00000000-0000-0000-0000-0000000000e2"
 
 psql -v ON_ERROR_STOP=1 -X -q -d "$TEST_DB" <<SQL
 select tests.create_user('$USER_A', 'cc-a@test.dev', 'ConcurrentA');

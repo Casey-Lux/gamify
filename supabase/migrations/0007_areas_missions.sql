@@ -1,8 +1,3 @@
--- =============================================================================
--- 0007_areas_missions.sql
--- spec section 8 "Áreas" + section 9 "Misiones"
--- =============================================================================
-
 create table public.areas (
   id           uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
@@ -11,7 +6,7 @@ create table public.areas (
   updated_at   timestamptz not null default now(),
 
   constraint areas_name_not_blank check (length(trim(name)) > 0),
-  -- Same reasoning as skills_unique_name_per_workspace above.
+
   constraint areas_unique_name_per_workspace unique (workspace_id, name)
 );
 
@@ -54,10 +49,6 @@ create trigger missions_set_updated_at
 before update on public.missions
 for each row execute function public.set_updated_at();
 
--- Cross-table integrity that a plain CHECK constraint cannot express: a
--- mission's skill/area/assignee must belong to the mission's own workspace.
--- This directly satisfies the "required workspace ownership" constraint listed
--- in spec section 45.
 create or replace function public.missions_validate_workspace_consistency()
 returns trigger
 language plpgsql

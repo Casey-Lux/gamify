@@ -26,7 +26,7 @@ const HABIT_SELECT = '*, skill:skills(id, name)';
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 2000;
 const MAX_REWARD = 1_000_000;
-const PAGE = 1000; // PostgREST max_rows (supabase/config.toml)
+const PAGE = 1000;
 
 export interface HabitInput {
   title: string;
@@ -36,19 +36,17 @@ export interface HabitInput {
   difficulty: MissionDifficulty;
   xpReward: number;
   coinReward: number;
-  /** "Diario" checkbox. When true `days` is ignored and all 7 days are used. */
+
   daily: boolean;
   days: number[];
-  /** "X veces por semana" (1..7), no concrete days. null/absent = by weekdays,
-   * in which case `daily` / `days` apply as always. */
+
   weeklyTarget?: number | null;
   dayPart: HabitDayPart;
-  /** `HH:MM`, or '' for no reminder. */
+
   reminderTime: string;
   adaptive: boolean;
 }
 
-/** Client-side checks for UX only; the real constraints live in 0027_habits.sql. */
 export function validateHabitInput(input: HabitInput) {
   const title = input.title.trim();
   const description = input.description.trim();
@@ -79,7 +77,7 @@ export function validateHabitInput(input: HabitInput) {
   ) {
     throw new HabitApiError('Las veces por semana deben ser un número entero entre 1 y 7.');
   }
-  // "X veces por semana" keeps every weekday available (no concrete days).
+
   const days =
     input.daily || weeklyTarget !== null
       ? [...ALL_WEEKDAYS]
@@ -136,7 +134,7 @@ export async function createHabit(
       coin_reward: input.coinReward,
       days_of_week: v.days,
       weekly_target: v.weeklyTarget,
-      // The schedule starts on the user's own local calendar day.
+
       schedule_effective_from: toLocalDateStr(),
       day_part: input.dayPart,
       reminder_time: v.reminderTime,
@@ -149,11 +147,6 @@ export async function createHabit(
   return data as Habit;
 }
 
-/**
- * Edits a habit's configuration. If the weekdays (or the weekly target) changed, the new schedule
- * takes effect TODAY (a new habit_schedule_history row is appended by a DB
- * trigger), so how past days were evaluated is never rewritten.
- */
 export async function updateHabit(habit: Habit, input: HabitInput): Promise<Habit> {
   const v = validateHabitInput(input);
   const sameDays =
@@ -190,7 +183,6 @@ export async function updateHabit(habit: Habit, input: HabitInput): Promise<Habi
   return data as Habit;
 }
 
-/** Habits are archived, never deleted, so their history stays intact. */
 export async function setHabitArchived(habitId: string, archived: boolean): Promise<void> {
   const { data, error } = await supabase
     .from('habits')
@@ -230,7 +222,6 @@ export async function completeHabit(habitId: string, date: string): Promise<Comp
   return row as CompleteMissionResult;
 }
 
-/** Messages for the history-edit RPCs (0029): same codes, different wording. */
 const EDIT_ERRORS: Record<string, string> = {
   GM002: 'Este hábito no es tuyo.',
   GM003: 'No hay ningún registro en esa fecha.',
@@ -238,11 +229,6 @@ const EDIT_ERRORS: Record<string, string> = {
   GM008: `Solo se pueden editar los últimos ${HABIT_HISTORY_EDIT_DAYS} días, desde que existe el hábito y si no está archivado.`
 };
 
-/**
- * History edit: registers a habit completion for a past day. Same economy as
- * `completeHabit` (XP, coins, active bonuses, levels, wallet) — the reward is
- * granted now; the server decides whether the date is editable.
- */
 export async function backfillHabitCompletion(
   habitId: string,
   date: string
@@ -258,7 +244,6 @@ export async function backfillHabitCompletion(
   return row as CompleteMissionResult;
 }
 
-/** History edit: corrects the date of an already registered completion (no reward changes). */
 export async function moveHabitCompletion(
   habitId: string,
   fromDate: string,
@@ -273,9 +258,6 @@ export async function moveHabitCompletion(
   invalidate('habits');
 }
 
-/** Completed occurrence dates (habit_date) per habit since `sinceDate`.
- * Reads the occurrence missions created by complete_habit; paged because
- * PostgREST caps a response at max_rows. */
 export async function fetchHabitCompletions(
   sinceDate: string,
   habitId?: string
@@ -319,8 +301,6 @@ export async function fetchScheduleHistory(
   return out;
 }
 
-/** Everything the habits view, the adaptation logic and the notifications
- * need, in three queries. `completed` covers the adaptation lookback window. */
 export async function fetchHabitsOverview(
   today: string = toLocalDateStr()
 ): Promise<HabitsOverview> {

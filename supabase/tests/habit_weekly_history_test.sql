@@ -1,9 +1,3 @@
--- =============================================================================
--- supabase/tests/habit_weekly_history_test.sql
--- 0029_habit_weekly_target_and_history_edit.sql:
---   * frecuencia "X veces por semana" (weekly_target) + historial de calendario
---   * backfill_habit_completion / move_habit_completion (edición del historial)
--- =============================================================================
 begin;
 
 do $$
@@ -33,7 +27,6 @@ begin
 
   perform tests.login_as(v_user);
 
-  -- ---- weekly_target: creation + validation -------------------------------
   insert into public.habits (workspace_id, user_id, skill_id, title, xp_reward, coin_reward, weekly_target, schedule_effective_from)
   values (v_ws, v_user, v_skill, 'Gimnasio', 10, 5, 3, current_date - 20)
   returning id into v_habit;
@@ -52,7 +45,6 @@ begin
     format($f$insert into public.habits (workspace_id, user_id, skill_id, title, weekly_target, days_of_week) values (%L, %L, %L, 'x', 2, '{1,3}')$f$, v_ws, v_user, v_skill),
     '23514', 'weekly_target needs all seven days available');
 
-  -- ---- changing only weekly_target still appends history ------------------
   update public.habits set weekly_target = 5, schedule_effective_from = current_date - 10 where id = v_habit;
   select count(*) into v_count from public.habit_schedule_history where habit_id = v_habit;
   assert v_count = 2, 'weekly_target change must add a history row';
@@ -60,7 +52,6 @@ begin
   where habit_id = v_habit and effective_from = current_date - 20;
   assert v_target = 3, 'old weekly_target must be preserved';
 
-  -- weekly -> specific days -> history keeps both worlds
   update public.habits
   set weekly_target = null, days_of_week = '{1,3}', schedule_effective_from = current_date - 5
   where id = v_habit;
@@ -70,12 +61,10 @@ begin
   where habit_id = v_habit and effective_from = current_date - 5;
   assert v_target is null, 'weekday schedule has no weekly_target';
 
-  -- non-schedule edits add nothing
   update public.habits set reminder_time = '09:00' where id = v_habit;
   select count(*) into v_count from public.habit_schedule_history where habit_id = v_habit;
   assert v_count = 3, 'non-schedule edit must not touch history';
 
-  -- ---- backfill_habit_completion -------------------------------------------
   select * into v_row from public.backfill_habit_completion(v_habit, current_date - 3);
   assert v_row.xp_awarded = 10 and v_row.coins_awarded = 5, 'backfill grants the normal rewards';
   select total_xp into v_xp from public.profiles where id = v_user;
@@ -88,14 +77,12 @@ begin
   where habit_id = v_habit and habit_date = current_date - 3 and status = 'DONE';
   assert v_count = 1, 'occurrence is DONE on the backfilled date';
 
-  -- no duplicates, no double reward
   perform tests.assert_raises(
     format('select * from public.backfill_habit_completion(%L, current_date - 3)', v_habit),
     'GM004', 'same day twice rejected');
   select total_xp into v_xp2 from public.profiles where id = v_user;
   assert v_xp2 = 10, 'no double reward';
 
-  -- window: before the habit existed, too old, future
   perform tests.assert_raises(
     format('select * from public.backfill_habit_completion(%L, current_date - 25)', v_habit),
     'GM008', 'before the habit existed rejected');
@@ -106,7 +93,6 @@ begin
     format('select * from public.backfill_habit_completion(%L, null)', v_habit),
     'GM008', 'null date rejected');
 
-  -- 30-day window for an old habit
   insert into public.habits (workspace_id, user_id, skill_id, title, xp_reward, coin_reward, schedule_effective_from)
   values (v_ws, v_user, v_skill, 'Viejo', 1, 0, current_date - 90)
   returning id into v_old;
@@ -115,7 +101,6 @@ begin
     'GM008', 'older than 30 days rejected');
   perform public.backfill_habit_completion(v_old, current_date - 30);
 
-  -- ---- move_habit_completion ----------------------------------------------
   perform public.backfill_habit_completion(v_habit, current_date - 2);
   select total_xp into v_xp from public.profiles where id = v_user;
 
@@ -129,7 +114,6 @@ begin
   select total_xp into v_xp2 from public.profiles where id = v_user;
   assert v_xp2 = v_xp, 'moving a completion changes no xp';
 
-  -- complete_habit (±1 day) sees the moved occurrence too: no duplicates
   perform tests.assert_raises(
     format('select * from public.complete_habit(%L, current_date - 1)', v_habit),
     'GM004', 'complete_habit sees backfilled/moved occurrence');
@@ -147,7 +131,6 @@ begin
     format('select public.move_habit_completion(%L, current_date - 1, current_date - 1)', v_habit),
     'GM008', 'same date is not a move');
 
-  -- ---- isolation -----------------------------------------------------------
   perform tests.login_as(v_other);
   perform tests.assert_raises(
     format('select * from public.backfill_habit_completion(%L, current_date - 4)', v_habit),
@@ -156,7 +139,6 @@ begin
     format('select public.move_habit_completion(%L, current_date - 1, current_date - 4)', v_habit),
     'GM002', 'cannot move someone else''s completion');
 
-  -- ---- archived habits are frozen -----------------------------------------
   perform tests.login_as(v_user);
   update public.habits set archived_at = now() where id = v_habit;
   perform tests.assert_raises(

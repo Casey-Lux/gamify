@@ -11,9 +11,9 @@
     xpReward: number;
     coinReward: number;
     status: MissionStatus;
-    /** `YYYY-MM-DD` or ''. */
+
     dueDate: string;
-    /** `HH:MM` or '' (optional: '' means date only, no time assumed). */
+
     dueTime: string;
     assignedTo: string;
     subtasks: EditableSubtask[];
@@ -32,7 +32,7 @@
     members: WorkspaceMemberOption[];
     isOwner: boolean;
     currentUserId: string | null;
-    /** Edit mode: the skill cannot be changed after creation (0015 grants). */
+
     lockSkill?: boolean;
     submitting: boolean;
     submitLabel: string;
@@ -56,21 +56,19 @@
     onSubmit
   }: Props = $props();
 
-  // The form edits a local copy seeded once from `initial`.
   // svelte-ignore state_referenced_locally
   let values = $state<MissionFormValues>({
     ...initial,
     subtasks: initial.subtasks.map((t) => ({ ...t }))
   });
 
-  // Default the skill once the catalog has loaded (create mode).
   $effect(() => {
     if (!values.skillId && skills[0]) values.skillId = skills[0].id;
   });
   $effect(() => {
     if (!values.assignedTo && currentUserId) values.assignedTo = currentUserId;
   });
-  // A time only makes sense together with a date.
+
   $effect(() => {
     if (values.dueDate === '' && values.dueTime !== '') values.dueTime = '';
   });
@@ -147,7 +145,7 @@
   <div class="grid-2">
     <label>
       Fecha límite (opcional)
-      <!-- Native graphical calendar picker; no extra dependency. -->
+
       <input type="date" bind:value={values.dueDate} />
     </label>
 

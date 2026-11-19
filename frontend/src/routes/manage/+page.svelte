@@ -10,10 +10,6 @@
   );
   const isOwner = $derived(role === 'OWNER');
 
-  // Spec section 4: only an OWNER administers skills/areas. This mirrors
-  // the redirect-on-auth pattern already used by src/routes/+layout.svelte —
-  // client-side only, for UX; `skills_insert_owner`/`areas_insert_owner`
-  // (0016_rls_policies.sql) are the actual authorization boundary.
   $effect(() => {
     if (role !== null && !isOwner) void goto('/missions');
   });

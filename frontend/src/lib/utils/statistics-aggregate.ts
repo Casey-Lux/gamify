@@ -1,7 +1,6 @@
 import { findBucketIndex } from './date-buckets';
 import type { StatBucket } from '$lib/types/statistics';
 
-/** Count of `dates` falling into each bucket, aligned index-for-index with `buckets`. */
 export function countByBucket(buckets: StatBucket[], dates: string[]): number[] {
   const counts = new Array(buckets.length).fill(0) as number[];
   for (const date of dates) {
@@ -11,7 +10,6 @@ export function countByBucket(buckets: StatBucket[], dates: string[]): number[] 
   return counts;
 }
 
-/** Sum of `{ date, value }.value` falling into each bucket. */
 export function sumByBucket(
   buckets: StatBucket[],
   entries: { date: string; value: number }[]
@@ -24,9 +22,6 @@ export function sumByBucket(
   return sums;
 }
 
-/** Groups `rows` by `keyFn(row)`, counting occurrences per key. Used for
- * "actividad por skill" / "actividad por área" (spec section 35), where the
- * X axis is a category, not a time bucket. */
 export function groupCount<T>(rows: T[], keyFn: (row: T) => string): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
@@ -36,11 +31,6 @@ export function groupCount<T>(rows: T[], keyFn: (row: T) => string): Map<string,
   return counts;
 }
 
-/**
- * Running total at the END of each bucket: `baseline` (what had already been
- * accumulated before the first bucket) plus everything earned up to and
- * including that bucket. Used for the "XP acumulada" chart.
- */
 export function cumulativeByBucket(
   buckets: StatBucket[],
   entries: { date: string; value: number }[],

@@ -24,7 +24,7 @@
     const next = checked
       ? [...filters.statuses, status]
       : filters.statuses.filter((s) => s !== status);
-    // Keep a stable, canonical order regardless of click order.
+
     onChange({ statuses: MISSION_STATUS_FILTER_OPTIONS.filter((s) => next.includes(s)) });
   }
 
@@ -37,8 +37,6 @@
     filters.statuses.length === 1 && filters.statuses[0] === 'DOING'
   );
 
-  // Individually-removable chips for every filter that isn't at its default
-  // value (spec section 21: "Permitir limpiar filtros individualmente...").
   const activeChips = $derived(
     (
       [

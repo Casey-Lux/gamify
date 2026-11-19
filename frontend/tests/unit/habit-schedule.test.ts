@@ -11,9 +11,9 @@ import {
 describe('habit-schedule', () => {
   it('formats local dates and ISO weekdays', () => {
     expect(toLocalDateStr(new Date(2026, 9, 6))).toBe('2026-10-06');
-    expect(isoWeekday('2026-10-06')).toBe(2); // martes
-    expect(isoWeekday('2026-10-04')).toBe(7); // domingo
-    expect(isoWeekday('2026-10-05')).toBe(1); // lunes
+    expect(isoWeekday('2026-10-06')).toBe(2);
+    expect(isoWeekday('2026-10-04')).toBe(7);
+    expect(isoWeekday('2026-10-05')).toBe(1);
   });
 
   it('adds days across month boundaries and lists ranges', () => {
@@ -31,10 +31,10 @@ describe('habit-schedule', () => {
       { effective_from: '2026-09-01', days_of_week: [1, 2, 3, 4, 5, 6, 7] },
       { effective_from: '2026-10-01', days_of_week: [1] }
     ];
-    expect(isScheduledOn(schedule, '2026-08-31')).toBe(false); // before the habit existed
-    expect(isScheduledOn(schedule, '2026-09-29')).toBe(true); // a Tuesday under the old, daily schedule
-    expect(isScheduledOn(schedule, '2026-10-06')).toBe(false); // a Tuesday under the new schedule
-    expect(isScheduledOn(schedule, '2026-10-05')).toBe(true); // a Monday under the new schedule
+    expect(isScheduledOn(schedule, '2026-08-31')).toBe(false);
+    expect(isScheduledOn(schedule, '2026-09-29')).toBe(true);
+    expect(isScheduledOn(schedule, '2026-10-06')).toBe(false);
+    expect(isScheduledOn(schedule, '2026-10-05')).toBe(true);
   });
 
   it('describes frequencies', () => {

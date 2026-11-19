@@ -1,14 +1,6 @@
-/**
- * Hand-written domain types mirroring the Postgres schema in
- * supabase/migrations. These are the single source of truth for the shape of
- * data on the frontend; the generated Supabase types (see
- * `npm run gen:types`, once a real project exists) can replace/augment these
- * later without changing how the rest of the app consumes them.
- */
-
 export type WorkspaceRole = 'OWNER' | 'MEMBER';
 export type MissionDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
-/** Stored workflow status. "Vencida" is NOT stored — it is derived (see isOverdue). */
+
 export type MissionStatus = 'TODO' | 'DOING' | 'DONE';
 export type EffectType = 'XP_MULTIPLIER' | 'COIN_MULTIPLIER' | 'XP_FLAT_BONUS' | 'COIN_FLAT_BONUS';
 export type ActivationStatus = 'ACTIVE' | 'EXPIRED';
@@ -84,15 +76,13 @@ export interface Mission {
   coin_reward: number;
   status: MissionStatus;
   due_at: string | null;
-  /** false = date-only deadline: due_at is just the local-midnight anchor of
-   * that day and no time of day is implied. */
+
   due_has_time: boolean;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** Mission joined with the columns the Missions view needs to render a card. */
 export interface MissionWithRelations extends Mission {
   skill: Pick<Skill, 'id' | 'name'> | null;
   area: Pick<Area, 'id' | 'name'> | null;
@@ -163,7 +153,6 @@ export interface ConsumableActivation {
   status: ActivationStatus;
 }
 
-/** Return row of the `complete_mission(p_mission_id uuid)` RPC. */
 export interface CompleteMissionResult {
   mission_id: string;
   completed_at: string;
@@ -185,7 +174,6 @@ export interface CompleteMissionResult {
   skill_leveled_up: boolean;
 }
 
-/** Return row of the `purchase_item(p_item_id uuid)` RPC. */
 export interface PurchaseItemResult {
   item_id: string;
   item_name: string;

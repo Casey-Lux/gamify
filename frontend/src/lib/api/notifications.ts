@@ -13,14 +13,11 @@ export class NotificationApiError extends Error {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Deadlines further away than this are not "próximas"; overdue items older
- * than OVERDUE_LOOKBACK_DAYS are no longer surfaced as notifications. */
+
 const UPCOMING_DAYS = 2;
 const OVERDUE_LOOKBACK_DAYS = 30;
 const BONUS_LOOKBACK_DAYS = 3;
 
-/** The caller's pending missions with a deadline near/over. Habit
- * occurrences are excluded (they only exist once completed). */
 export async function fetchDueMissions(userId: string, now: number): Promise<DueMission[]> {
   const { data, error } = await supabase
     .from('missions')
@@ -49,7 +46,6 @@ interface BonusRow {
   mission: { title: string } | null;
 }
 
-/** Recent completions where a multiplier or flat bonus was actually applied. */
 export async function fetchBonusCompletions(now: number): Promise<BonusCompletion[]> {
   const { data, error } = await supabase
     .from('mission_completions')

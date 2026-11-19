@@ -25,8 +25,6 @@
   let submitting = $state(false);
   let error = $state<string | null>(null);
 
-  // Espejo exacto de los CHECK constraints de 0011_store_items.sql, para dar
-  // feedback inmediato en vez de esperar el error 400 de Postgres.
   const validationError = $derived.by(() => {
     if (name.trim().length === 0) return 'El nombre no puede estar vacío.';
     if (price < 0) return 'El precio no puede ser negativo.';
@@ -54,7 +52,7 @@
         duration_minutes: durationMinutes
       });
       await storeStore.load(workspaceId);
-      // Ajusta esta ruta si tu página de tienda vive en otra URL (p. ej. /tienda).
+
       await goto('/store');
     } catch (err) {
       error =

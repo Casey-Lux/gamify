@@ -11,7 +11,6 @@
     $workspaceStore.memberships.find((m) => m.workspace_id === workspaceId)?.role === 'OWNER'
   );
 
-  // "Diario" is checked by default.
   const initial: HabitFormValues = {
     title: '',
     description: '',

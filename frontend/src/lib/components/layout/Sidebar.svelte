@@ -11,9 +11,6 @@
     { href: '/profile', label: 'Perfil' }
   ];
 
-  // Spec section 4: only an OWNER administers skills/areas — hidden for a
-  // MEMBER rather than shown-then-redirected, to avoid an inviting link
-  // straight into a bounce.
   const isOwner = $derived(
     $workspaceStore.memberships.find((m) => m.workspace_id === $workspaceStore.activeWorkspaceId)
       ?.role === 'OWNER'
@@ -40,9 +37,6 @@
 
 <style>
   .sidebar {
-    /* Hidden by default (mobile-first); shown at the desktop breakpoint
-     * below. Rendered unconditionally in the DOM either way — spec section
-     * 25: "Usar el mismo código funcional para ambos dispositivos." */
     display: none;
   }
 
@@ -83,6 +77,4 @@
     color: white;
     background: #23233240;
   }
-  /* No :hover-only affordance (spec: "sin dependencia de hover") — active
-   * state is driven by the current route, not pointer position. */
 </style>

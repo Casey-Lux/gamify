@@ -12,7 +12,7 @@
     coinReward: number;
     daily: boolean;
     days: number[];
-    /** true = "X veces por semana" (no concrete days), false = by weekdays. */
+
     weekly: boolean;
     weeklyTarget: number;
     dayPart: HabitDayPart;
@@ -30,7 +30,7 @@
     initial: HabitFormValues;
     skills: Skill[];
     areas: Area[];
-    /** Edit mode: the skill cannot change after creation. */
+
     lockSkill?: boolean;
     submitting: boolean;
     submitLabel: string;
@@ -51,7 +51,6 @@
     onSubmit
   }: Props = $props();
 
-  // The form edits a local copy seeded once from `initial`.
   // svelte-ignore state_referenced_locally
   let values = $state<HabitFormValues>({ ...initial, days: [...initial.days] });
   // svelte-ignore state_referenced_locally
@@ -63,8 +62,7 @@
 
   function toggleDaily(checked: boolean) {
     values.daily = checked;
-    // Leaving "Diario" with nothing selected would be invalid: start from
-    // every day so the user just unticks the ones they don't want.
+
     if (!checked && values.days.length === 0) values.days = [...ALL_WEEKDAYS];
   }
 

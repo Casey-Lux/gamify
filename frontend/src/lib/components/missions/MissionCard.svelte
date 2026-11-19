@@ -29,9 +29,7 @@
   const isCompleted = $derived(mission.completed_at !== null);
   const overdue = $derived(isOverdue(mission.due_at, mission.completed_at, mission.due_has_time));
   const hasSubtasks = $derived(mission.subtasks.length > 0);
-  // Spec section 10: the Complete button stays disabled while any subtask is
-  // unchecked. The real gate is server-side (complete_mission RPC step 6);
-  // this is UX convenience only.
+
   const allSubtasksDone = $derived(mission.subtasks.every((t) => t.completed));
   const canComplete = $derived(!isCompleted && (!hasSubtasks || allSubtasksDone) && !completing);
 </script>
@@ -103,8 +101,7 @@
     {#if !isCompleted}
       <a class="action-btn" href={`/missions/${mission.id}/edit`}>Editar</a>
     {/if}
-    <!-- Completed missions are permanent history (mission_completions is
-         ON DELETE RESTRICT), so they cannot be deleted. -->
+
     {#if !isCompleted}
       <button
         type="button"

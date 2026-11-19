@@ -1,12 +1,3 @@
--- =============================================================================
--- 0004_profiles.sql
--- spec section 5 "Usuario"
--- =============================================================================
--- NOTE (documented per "decisiones secundarias" rule): the trigger that
--- auto-creates a profiles row when a new auth.users row appears is wired up in
--- Fase 3 (Auth), since it belongs conceptually with Auth setup. The table and
--- its constraints/RLS-readiness are schema concerns and belong here in Fase 2.
-
 create table public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
@@ -32,5 +23,3 @@ before update on public.profiles
 for each row execute function public.set_updated_at();
 
 alter table public.profiles enable row level security;
--- Policies are defined together in 0016_rls_policies.sql so the full access
--- model can be reviewed as a single unit.

@@ -23,26 +23,11 @@ export class MissionApiError extends Error {
 
 export interface MissionPage {
   missions: MissionWithRelations[];
-  /** Total rows matching the current filters (for "página X de Y" / hasMore). */
+
   totalCount: number;
   hasMore: boolean;
 }
 
-/**
- * Spec sections 21-22: filters are acumulative (AND), sort is a single field
- * + direction with a deterministic secondary order by id, and the frontend
- * never loads more than one page's worth of rows.
- *
- * Pagination strategy (documented secondary decision, spec section 56 — pick
- * the simplest option when not fully specified): `range()`-based
- * offset pagination rather than a keyset cursor. The spec allows either
- * ("paginación/cursor pagination"); for the expected MVP data volumes (one
- * person's or one small team's missions) offset pagination is simpler to
- * reason about, still bounds the rows fetched per request, and composes
- * trivially with arbitrary sort fields + filters. If a workspace's mission
- * count later grows large enough for `OFFSET` cost to matter, this is an
- * isolated change to this one function.
- */
 const MISSION_SELECT = `
       id, workspace_id, created_by, assigned_to, skill_id, area_id, title,
       description, difficulty, xp_reward, coin_reward, status, due_at, due_has_time,
@@ -60,8 +45,7 @@ export async function fetchMissionsPage(
   let query = supabase.from('missions').select(MISSION_SELECT, { count: 'exact' });
 
   query = applyFilters(query, filters);
-  // Habit occurrences (created only when a habit is completed) belong to the
-  // Habits view; they never show up in, or count towards, the mission list.
+
   query = query.is('habit_id', null);
   query = applySort(query, sort);
 
@@ -81,8 +65,6 @@ export async function fetchMissionsPage(
   };
 }
 
-// Exported (not just used internally) so filter/sort logic can be unit
-// tested against a fake query-builder double, without a real Supabase client.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyFilters(query: any, filters: MissionFilters, now: number = Date.now()) {
   const statusClause = buildStatusClause(filters.statuses, now);
@@ -99,18 +81,6 @@ export function applyFilters(query: any, filters: MissionFilters, now: number = 
   return query;
 }
 
-/**
- * PostgREST `or=(...)` expression for the status filter (selected values
- * combine with OR; an empty selection applies no status filter at all).
- *
- * TODO / DOING / DONE are stored statuses. OVERDUE ("vencida") is derived and
- * mirrors `isDueOverdue` in utils/due-date.ts exactly:
- *   not completed AND (
- *     exact deadline  AND due_at < now
- *     OR date-only    AND due_at < local midnight of today   -- whole day elapsed
- *   )
- * so it can overlap with TODO / DOING, and a DONE mission is never overdue.
- */
 export function buildStatusClause(statuses: MissionFilters['statuses'], now: number): string {
   const parts: string[] = [];
   for (const status of statuses) {
@@ -134,22 +104,15 @@ export function buildStatusClause(statuses: MissionFilters['statuses'], now: num
 export function applySort(query: any, sort: MissionSort) {
   const ascending = sort.direction === 'ASC';
 
-  // Documented deterministic NULL behaviour (spec section 22): due_at NULL
-  // values always sort LAST, regardless of ASC/DESC — a mission "sin fecha
-  // límite" is treated as "further away" than any dated mission in both
-  // directions, which matches how the Missions UI groups undated missions at
-  // the bottom of the list either way.
   const nullsFirst = sort.field === 'due_at' ? false : undefined;
 
   query = query.order(sort.field, { ascending, nullsFirst });
-  // Deterministic secondary order (spec: "Usar orden secundario determinista
-  // por id."), independent of the primary sort direction.
+
   query = query.order('id', { ascending: true });
 
   return query;
 }
 
-/** Spec section 13: calls the `complete_mission` RPC and returns its result. */
 export async function completeMission(missionId: string): Promise<CompleteMissionResult> {
   const { data, error } = await supabase.rpc('complete_mission', { p_mission_id: missionId });
 
@@ -161,7 +124,6 @@ export async function completeMission(missionId: string): Promise<CompleteMissio
   return row as CompleteMissionResult;
 }
 
-/** Toggles one subtask's `completed` flag (spec section 10). */
 export async function setSubtaskCompleted(
   subtaskId: string,
   completed: boolean
@@ -180,14 +142,12 @@ export async function setSubtaskCompleted(
 
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 2000;
-const MAX_REWARD = 1_000_000; // sanity cap only — Postgres just requires >= 0 (0007), this
-// only stops an obvious typo (e.g. an extra zero) before it ever reaches the network.
+const MAX_REWARD = 1_000_000;
 
 export interface NewMissionInput {
   workspaceId: string;
   createdBy: string;
-  /** Spec section 4: a MEMBER may only assign to themselves; an OWNER may
-   * assign to anyone (enforced for real by RLS `missions_insert`, 0016). */
+
   assignedTo: string;
   skillId: string;
   areaId: string | null;
@@ -197,28 +157,14 @@ export interface NewMissionInput {
   xpReward: number;
   coinReward: number;
   status: MissionStatus;
-  /** `YYYY-MM-DD` from the calendar picker, or '' for "sin fecha límite"
-   * (spec section 9: due_at is nullable and not required). */
+
   dueDate: string;
-  /** `HH:MM`, optional. '' = the user chose a date only: no time is assumed. */
+
   dueTime: string;
-  /** Subtask titles, in display order. Spec section 10: subtasks carry no
-   * reward of their own, so only the title is collected here. */
+
   subtaskTitles: string[];
 }
 
-/**
- * Spec section 9 "Misiones" + section 10 "Submisiones". Client-side checks
- * here mirror (but do not replace) the real constraints in
- * `0007_areas_missions.sql` / `0008_mission_subtasks.sql` — spec section 32:
- * "Las validaciones frontend son para UX." Two inserts (mission, then its
- * subtasks) rather than one RPC: unlike `complete_mission`/`purchase_item`
- * this isn't an economic operation with a race condition to close (nobody
- * else can see or act on a mission until its own creator finishes creating
- * it), so a plain multi-step client flow is the simplest option that
- * satisfies section 56 without inventing a `create_mission` RPC the spec
- * never asked for.
- */
 type MissionFields = Pick<
   NewMissionInput,
   | 'skillId'
@@ -231,7 +177,6 @@ type MissionFields = Pick<
   | 'subtaskTitles'
 >;
 
-/** Shared by create and edit so both enforce exactly the same rules. */
 function validateMissionFields(input: MissionFields) {
   const title = input.title.trim();
   const description = input.description.trim();
@@ -295,7 +240,7 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
 
   if (error) throw new MissionApiError(error.message, error.code);
   const mission = data as Mission;
-  // The mission exists from here on, even if its subtasks fail below.
+
   invalidate('missions');
 
   if (subtaskTitles.length > 0) {
@@ -305,9 +250,7 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
       position: index
     }));
     const { error: subtaskError } = await supabase.from('mission_subtasks').insert(rows);
-    // The mission itself was already created successfully at this point;
-    // surface the subtask failure distinctly so the UI can say so instead of
-    // implying the whole mission creation failed.
+
     if (subtaskError) {
       throw new MissionApiError(
         `La misión se creó, pero las submisiones no se pudieron guardar: ${subtaskError.message}`,
@@ -320,15 +263,13 @@ export async function createMission(input: NewMissionInput): Promise<Mission> {
 }
 
 export interface EditableSubtask {
-  /** Present for a subtask that already exists in the database. */
   id?: string;
   title: string;
 }
 
 export interface UpdateMissionInput {
   missionId: string;
-  /** Only an OWNER may change this (RLS `missions_update` + the workspace
-   * consistency trigger); callers pass the current value when not changing it. */
+
   assignedTo: string;
   skillId: string;
   areaId: string | null;
@@ -343,7 +284,6 @@ export interface UpdateMissionInput {
   subtasks: EditableSubtask[];
 }
 
-/** Loads one mission with the same relations the list uses (for the edit form). */
 export async function fetchMissionById(missionId: string): Promise<MissionWithRelations | null> {
   const { data, error } = await supabase
     .from('missions')
@@ -355,13 +295,6 @@ export async function fetchMissionById(missionId: string): Promise<MissionWithRe
   return (data as unknown as MissionWithRelations | null) ?? null;
 }
 
-/**
- * Edits an existing mission. skill_id / workspace_id / created_by /
- * completed_at are not updatable by the client (0015 column grants), so the
- * skill cannot change here either — only the fields in the grant are sent.
- * Subtasks are reconciled: removed rows deleted, existing rows renamed /
- * reordered (their `completed` state is untouched), new rows inserted.
- */
 export async function updateMission(input: UpdateMissionInput): Promise<Mission> {
   const { title, description, due } = validateMissionFields({
     ...input,
@@ -387,8 +320,7 @@ export async function updateMission(input: UpdateMissionInput): Promise<Mission>
     .maybeSingle();
 
   if (error) throw new MissionApiError(error.message, error.code);
-  // RLS hides rows the user may not update: PostgREST then returns no row
-  // instead of an error, which must not look like a successful save.
+
   if (!data)
     throw new MissionApiError('No se encontró la misión o no tienes permiso para editarla.');
 
@@ -448,11 +380,6 @@ async function syncSubtasks(missionId: string, edited: EditableSubtask[]) {
   return null;
 }
 
-/**
- * Deletes a mission (its subtasks cascade). Completed missions are kept:
- * mission_completions.mission_id is ON DELETE RESTRICT (immutable history,
- * 0009), so the database refuses — surfaced here as a readable message.
- */
 export async function deleteMission(missionId: string): Promise<void> {
   const { data, error } = await supabase.from('missions').delete().eq('id', missionId).select('id');
 

@@ -32,20 +32,17 @@ export interface HabitNotificationInput {
 
 export interface NotificationSources {
   now: number;
-  /** Local date `YYYY-MM-DD` of `now`. */
+
   today: string;
-  /** Not-completed missions that have a deadline. */
+
   missions: DueMission[];
   activeEffects: ConsumableActivation[];
   bonusCompletions: BonusCompletion[];
   habits: HabitNotificationInput[];
 }
 
-/** A deadline is "soon" when it falls within this window. */
 export const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Instant the mission actually becomes overdue: the exact due time, or the
- * end of the chosen day for a date-only deadline. */
 function deadlineMs(m: DueMission): number {
   const due = new Date(m.due_at);
   if (m.due_has_time) return due.getTime();
@@ -105,7 +102,6 @@ export function deriveBonusNotifications(s: NotificationSources): AppNotificatio
   return out;
 }
 
-/** HH:MM:SS (or HH:MM) -> minutes since midnight. */
 function minutesOf(time: string): number {
   const [h, m] = time.split(':').map(Number) as [number, number];
   return h * 60 + m;
@@ -120,8 +116,6 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
   for (const { habit, info } of s.habits) {
     if (habit.archived_at || !info.scheduledToday || info.doneToday) continue;
 
-    // Special reminder from the adaptive logic: the weekday has a weak
-    // track record. Shown all day, independently of the habit's own reminder.
     if (habit.adaptive && info.plan === 'REMINDER') {
       const day = (WEEKDAY_LABEL[info.stat.weekday] ?? '').toLowerCase();
       out.push({
@@ -134,9 +128,6 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
       });
     }
 
-    // "X veces por semana": no day of the week is left to spare, so today is
-    // needed to reach the goal. Same all-day treatment as the special
-    // reminder above (works even if the habit has no reminder time).
     if (info.weekly?.urgent) {
       const left = info.weekly.target - info.weekly.done;
       out.push({
@@ -149,8 +140,6 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
       });
     }
 
-    // Regular reminder: only once its time has been reached, and never for
-    // a day the adaptive logic considers optional.
     const optional = habit.adaptive && info.plan === 'OPTIONAL';
     if (habit.reminder_time && !optional && nowMinutes >= minutesOf(habit.reminder_time)) {
       out.push({
@@ -168,7 +157,6 @@ export function deriveHabitNotifications(s: NotificationSources): AppNotificatio
   return out;
 }
 
-/** Every derivable notification, newest event first. */
 export function deriveNotifications(s: NotificationSources): AppNotification[] {
   return [
     ...deriveDeadlineNotifications(s),

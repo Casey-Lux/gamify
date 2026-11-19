@@ -1,22 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
-# supabase/tests/run_db_tests.sh
-# Fase 12 — spec sección 44 "Database tests"
-#
-# Builds a disposable PostgreSQL database, applies _harness.sql (stand-in
-# auth/storage schemas + roles, spec section 44 requires testing against
-# real RLS/RPC behavior, not mocks) then every migration in order, then
-# every *_test.sql file in this directory, then the shell-based concurrency
-# tests. Exits non-zero if anything failed.
-#
-# Requires a PostgreSQL server reachable as a superuser (default: the local
-# `postgres` OS/db user via the Unix socket — exactly how this was verified
-# in the development sandbox). Override via PGHOST/PGPORT/PGUSER/PGDATABASE
-# env vars to point at a different server (e.g. a CI service container).
-#
-# Usage:
-#   supabase/tests/run_db_tests.sh
-# =============================================================================
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

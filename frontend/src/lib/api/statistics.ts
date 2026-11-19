@@ -22,13 +22,6 @@ interface CompletionRow {
   mission: { area_id: string | null; area: { name: string } | null } | null;
 }
 
-/**
- * Spec section 35: "Utilizar mission_completions... como fuentes" — this
- * reads the immutable history table directly (RLS already restricts it to
- * the caller's own rows), joining in just the skill/area *names* needed to
- * label "actividad por skill"/"actividad por área". No aggregate table is
- * read or written.
- */
 export async function fetchCompletions(sinceIso: string): Promise<CompletionWithContext[]> {
   const { data, error } = await supabase
     .from('mission_completions')
@@ -56,9 +49,6 @@ export async function fetchCompletions(sinceIso: string): Promise<CompletionWith
   }));
 }
 
-/** Spec section 35: "monedas ganadas / monedas gastadas" — both come from
- * the same immutable ledger (amount > 0 is income, amount < 0 is spend; see
- * 0010_wallet_transactions.sql), not from two separate tables. */
 export async function fetchWalletTransactions(sinceIso: string): Promise<WalletTransaction[]> {
   const { data, error } = await supabase
     .from('wallet_transactions')
@@ -77,9 +67,6 @@ interface PlayerSkillRow {
   skill: { name: string } | null;
 }
 
-/** Current per-skill level/XP for the radar chart — this is a snapshot of
- * the player's present standing (like the User Card), not a windowed
- * activity query, so it takes no date range. */
 export async function fetchSkillProgress(): Promise<SkillProgress[]> {
   const { data, error } = await supabase
     .from('player_skills')

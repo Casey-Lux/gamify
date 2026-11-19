@@ -1,12 +1,3 @@
--- =============================================================================
--- 0028_notification_reads.sql
--- Centro de notificaciones. Las notificaciones NO se almacenan: se derivan de
--- datos que ya existen (misiones con fecha límite, efectos activos,
--- mission_completions con bonus, recordatorios de hábitos). Solo se persiste
--- qué notificaciones (por clave determinista) ha leído el usuario, para que
--- el estado leído/no leído sobreviva entre dispositivos.
--- =============================================================================
-
 create table public.notification_reads (
   user_id          uuid not null references public.profiles (id) on delete cascade,
   notification_key text not null,

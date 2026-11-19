@@ -7,9 +7,9 @@
   interface Props {
     title: string;
     config: ChartConfiguration;
-    /** Canvas height in px. */
+
     height?: number;
-    /** Optional controls (e.g. a selector) shown under the title. */
+
     controls?: Snippet;
   }
 
@@ -20,13 +20,10 @@
 
   onMount(async () => {
     const { Chart: ChartCtor } = await loadChartJs();
-    if (!canvasEl) return; // component was destroyed before the import resolved
+    if (!canvasEl) return;
     chartInstance = new ChartCtor(canvasEl, config);
   });
 
-  // Re-applies new data/options in place (e.g. the user switches the
-  // día/semana/mes granularity toggle) instead of tearing down and
-  // recreating the Chart.js instance on every change.
   $effect(() => {
     if (!chartInstance) return;
     chartInstance.data = config.data;

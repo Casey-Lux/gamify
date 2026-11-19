@@ -16,8 +16,7 @@
 
   onMount(() => {
     void habitsStore.ensureLoaded();
-    // A tab left open past midnight must switch to the new day. Local only:
-    // no query is made when the window regains focus.
+
     const onVisible = () => {
       if (document.visibilityState === 'visible') habitsStore.syncToday();
     };
@@ -55,8 +54,6 @@
     completingId = habit.id;
     actionError = null;
     try {
-      // Always the real local day at the moment of the action; the database
-      // validates the date and refuses a duplicate.
       habitsStore.syncToday();
       const result = await completeHabit(habit.id, toLocalDateStr());
       lastReward = {
@@ -64,11 +61,11 @@
         coins: result.coins_awarded,
         leveledUp: result.player_leveled_up
       };
-      // Notifications refresh themselves: completing invalidates 'habits'.
+
       await Promise.all([habitsStore.load(), auth.refreshProfile(), userSkillsStore.load()]);
     } catch (err) {
       actionError = err instanceof HabitApiError ? err.message : 'No se pudo completar el hábito.';
-      // e.g. already completed from another device: show the real state.
+
       void habitsStore.load();
     } finally {
       completingId = null;

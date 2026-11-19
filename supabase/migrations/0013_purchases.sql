@@ -1,8 +1,3 @@
--- =============================================================================
--- 0013_purchases.sql
--- spec section 20 "Purchases"
--- =============================================================================
-
 create table public.purchases (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.profiles (id) on delete restrict,

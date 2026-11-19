@@ -14,14 +14,6 @@ export class CatalogApiError extends Error {
 const MAX_NAME_LENGTH = 60;
 const MAX_DESCRIPTION_LENGTH = 500;
 
-/**
- * Client-side validation only exists for UX (spec section 32: "Las
- * validaciones frontend son para UX. La seguridad real debe estar en
- * PostgreSQL/RLS/RPC."). `skills_insert_owner` (0016_rls_policies.sql) is
- * the real authorization boundary — a MEMBER calling this still gets
- * rejected by Postgres, this only avoids a pointless round-trip and gives a
- * friendlier message than the raw RLS error.
- */
 export async function createSkill(
   workspaceId: string,
   name: string,

@@ -19,9 +19,6 @@
 
   let { children } = $props();
 
-  // Reachable without a session. Only /login bounces an authenticated user
-  // away; /check-email must stay visible right after sign-up even if Supabase
-  // created a session immediately (email confirmation disabled).
   const PUBLIC_ROUTES = new Set(['/login', '/check-email']);
 
   onMount(() => {
@@ -29,13 +26,9 @@
     return installPrompt.init();
   });
 
-  // Auth guard: redirect to /login when there's no session, and away from
-  // /login once there is one. This app has no SSR (adapter-static), so the
-  // guard runs entirely client-side, once auth state is known.
   $effect(() => {
     if ($auth.loading) return;
-    // Unknown routes are handled by +error.svelte, which sends them to `/`
-    // (and `/` then resolves to /login or /missions below).
+
     if (page.status === 404) return;
     const pathname = page.url.pathname;
     const isPublic = PUBLIC_ROUTES.has(pathname);
@@ -47,17 +40,10 @@
     }
   });
 
-  // Keyed by user id (a primitive) so these effects run once per sign-in, not
-  // every time the session object is replaced (token refresh, tab refocus).
   const userId = $derived($auth.session?.user.id ?? null);
 
-  // Views keep their data in memory between visits, so when the signed-in
-  // user changes (logout, another account) nothing of the previous one may
-  // survive.
   let lastUserId: string | null = null;
 
-  // Once authenticated, load the active workspace, its skill/area catalog,
-  // and the User Card's own skill-progress list.
   $effect(() => {
     if (lastUserId !== null && lastUserId !== userId) {
       missionsStore.reset();
@@ -73,8 +59,6 @@
     void userSkillsStore.load();
   });
 
-  // Notification center: loaded once per sign-in and then refreshed only when
-  // an action changes its sources (no polling, no refetch on window focus).
   $effect(() => {
     if (!userId) {
       notificationsStore.reset();
@@ -130,13 +114,6 @@
     height: 100vh;
   }
 
-  /*
-   * Spec section 25 "Responsive design": one shell, one markup tree, for
-   * both desktop and Android — Sidebar and BottomNav each decide their own
-   * visibility via their own media queries (mobile-first: hidden unless the
-   * breakpoint says otherwise), so nothing here needs a JS viewport check
-   * or two separate render branches.
-   */
   .app-shell {
     display: flex;
     min-height: 100vh;
@@ -149,8 +126,7 @@
   }
   .app-shell__page {
     flex: 1;
-    /* Room for the fixed BottomNav on mobile; desktop has no bottom nav so
-     * no extra padding is needed there. */
+
     padding-bottom: 4.5rem;
   }
   @media (min-width: 860px) {

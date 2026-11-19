@@ -14,8 +14,7 @@ export interface StatisticsState {
   skillProgress: SkillProgress[];
   loading: boolean;
   error: string | null;
-  /** True when the current data came from the IndexedDB cache (spec
-   * section 27) instead of a successful network read for this granularity. */
+
   fromCache: boolean;
   cachedAt: string | null;
 }
@@ -39,7 +38,7 @@ const initialState: StatisticsState = {
 
 function createStatisticsStore() {
   const { subscribe, update, set } = writable<StatisticsState>(initialState);
-  /** `versionOf('statistics')` the data on screen was fetched under (-1 = never). */
+
   let loadedVersion = -1;
 
   async function load(granularity: StatGranularity) {
@@ -93,9 +92,6 @@ function createStatisticsStore() {
     }
   }
 
-  /** Called when the Statistics view opens: queries only if nothing was
-   * fetched yet or a completion / purchase invalidated the numbers. Keeps the
-   * granularity the user last picked. */
   function ensureLoaded() {
     if (loadedVersion !== versionOf('statistics')) return load(get({ subscribe }).granularity);
     return Promise.resolve();

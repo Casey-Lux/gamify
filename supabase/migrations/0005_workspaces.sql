@@ -1,13 +1,3 @@
--- =============================================================================
--- 0005_workspaces.sql
--- spec section 4 "Workspace / organización"
--- =============================================================================
--- Design note (documented secondary decision): ownership is modeled purely
--- through workspace_members.role = 'OWNER', not a duplicate workspaces.owner_id
--- column. A single source of truth for "who owns what" avoids the two values
--- ever disagreeing. A workspace can have more than one OWNER over time (e.g.
--- ownership transfer), which the model supports for free.
-
 create table public.workspaces (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,

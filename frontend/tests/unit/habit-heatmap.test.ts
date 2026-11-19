@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHeatmap, heatmapStart } from '../../src/lib/utils/habit-heatmap';
 
-const TODAY = '2026-10-06'; // martes
+const TODAY = '2026-10-06';
 const DAILY = [{ effective_from: '2026-09-01', days_of_week: [1, 2, 3, 4, 5, 6, 7] }];
 
 describe('buildHeatmap', () => {
@@ -24,7 +24,7 @@ describe('buildHeatmap', () => {
 
   it('counts scheduled days and completions', () => {
     const map = buildHeatmap(TODAY, 2, DAILY, ['2026-10-05', '2026-10-06']);
-    expect(map.scheduled).toBe(9); // 28 sep .. 6 oct
+    expect(map.scheduled).toBe(9);
     expect(map.completed).toBe(2);
   });
 
@@ -35,6 +35,6 @@ describe('buildHeatmap', () => {
     expect(byDate['2026-10-02']).toBe('off');
     expect(byDate['2026-10-03']).toBe('done');
     expect(byDate['2026-09-28']).toBe('missed');
-    expect(map.completed).toBe(0); // the extra day is not a scheduled one
+    expect(map.completed).toBe(0);
   });
 });

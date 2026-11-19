@@ -13,10 +13,6 @@
   let intervalId: ReturnType<typeof setInterval> | undefined;
 
   onMount(() => {
-    // Purely visual 1-second tick for the countdown text and for hiding
-    // effects whose time ran out. Whether an effect is *actually* still
-    // active is always decided by Postgres (spec section 16) when a reward
-    // or purchase is computed; this timer never talks to the server.
     intervalId = setInterval(() => {
       now = Date.now();
     }, 1000);

@@ -28,9 +28,6 @@
 
 <style>
   .bottom-nav {
-    /* Hidden by default; shown only below the desktop breakpoint, where the
-     * Sidebar (which has its own opposite media query) is hidden instead —
-     * spec section 25: "Android: navegación inferior." */
     display: none;
   }
 
@@ -55,9 +52,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.15rem;
-    /* Touch target well above the usual 44px minimum, since this is the
-     * primary navigation surface on mobile — spec: "touch targets
-     * adecuados". */
+
     min-height: 56px;
     color: var(--text-muted, #a0a0b0);
     text-decoration: none;

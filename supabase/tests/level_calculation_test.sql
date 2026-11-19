@@ -1,16 +1,3 @@
--- =============================================================================
--- supabase/tests/level_calculation_test.sql
--- Fase 4 — "La fórmula debe: estar testeada"
---
--- Plain assertion-based SQL test (no external framework required, so it runs
--- anywhere psql does: locally, in CI, or against a preview branch). Every
--- assertion RAISEs on failure, so a clean run with no output past the final
--- NOTICE means every check passed.
---
--- Run with:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/level_calculation_test.sql
--- =============================================================================
-
 do $$
 declare
   v_level  integer;
@@ -18,12 +5,10 @@ declare
   v_prev   integer;
   v_row    record;
 begin
-  -- 1. Level 1 costs exactly 0 XP (spec: "nivel 1 = 0 XP").
+
   assert public.xp_for_level(1) = 0, 'xp_for_level(1) must be 0';
   assert public.calculate_level(0) = 1, 'calculate_level(0) must be 1';
 
-  -- 2. calculate_level is exact at thresholds: xp_for_level(N) is the first
-  --    XP value that yields level N, and xp_for_level(N) - 1 must NOT yet.
   for v_level in 1..25 loop
     v_xp := public.xp_for_level(v_level);
     assert public.calculate_level(v_xp) = v_level,
@@ -36,7 +21,6 @@ begin
     end if;
   end loop;
 
-  -- 3. Monotonic: xp_for_level is strictly increasing.
   v_prev := public.xp_for_level(1);
   for v_level in 2..50 loop
     v_xp := public.xp_for_level(v_level);
@@ -46,8 +30,6 @@ begin
     v_prev := v_xp;
   end loop;
 
-  -- 4. Each level step costs strictly more XP than the previous step (spec:
-  --    "cada nivel posterior requiere más XP que el anterior").
   declare
     v_prev_cost integer;
     v_cost integer;
@@ -62,11 +44,10 @@ begin
     end loop;
   end;
 
-  -- 5. calculate_level never decreases as XP increases (monotonic non-decreasing).
   declare
     v_prev_level integer := public.calculate_level(0);
   begin
-    for v_xp in 0..5000 by 137 loop  -- odd step to hit non-boundary values too
+    for v_xp in 0..5000 by 137 loop
       v_level := public.calculate_level(v_xp);
       assert v_level >= v_prev_level,
         format('calculate_level must be non-decreasing: xp=%s gave level %s after level %s',
@@ -75,8 +56,6 @@ begin
     end loop;
   end;
 
-  -- 6. calculate_level_progress: internal consistency at an arbitrary
-  --    mid-level XP value.
   select * into v_row from public.calculate_level_progress(350);
   assert v_row.level = public.calculate_level(350),
     'progress.level must match calculate_level(350)';
@@ -89,8 +68,6 @@ begin
   assert v_row.progress_percent >= 0 and v_row.progress_percent <= 100,
     format('progress_percent must be within [0, 100], got %s', v_row.progress_percent);
 
-  -- 7. Progress is exactly 0%% right at a level threshold, and climbs toward
-  --    (but never reaches) 100%% just before the next one.
   select * into v_row from public.calculate_level_progress(public.xp_for_level(4));
   assert v_row.progress_percent = 0,
     format('progress_percent must be 0 exactly at a level threshold, got %s', v_row.progress_percent);
@@ -99,13 +76,12 @@ begin
   assert v_row.progress_percent < 100,
     format('progress_percent must be < 100 one XP before leveling up, got %s', v_row.progress_percent);
 
-  -- 8. Invalid input is rejected, not silently coerced.
   begin
     perform public.calculate_level(-1);
     raise exception 'calculate_level(-1) should have raised but did not';
   exception
     when sqlstate '22023' then
-      null; -- expected
+      null;
   end;
 
   begin
@@ -113,20 +89,13 @@ begin
     raise exception 'xp_for_level(0) should have raised but did not';
   exception
     when sqlstate '22023' then
-      null; -- expected
+      null;
   end;
 
   raise notice 'level_calculation_test.sql: all assertions passed';
 end;
 $$;
 
--- ---------------------------------------------------------------------------
--- 9. Trigger integration: profiles.level and player_skills.level must be
---    kept in sync automatically by 0021_level_sync_triggers.sql. Requires a
---    real profiles/skills/player_skills row, so this part is wrapped in a
---    transaction that is always rolled back — it never leaves test data
---    behind, and works whether or not the caller already has real data.
--- ---------------------------------------------------------------------------
 begin;
 
   insert into auth.users (id, email)

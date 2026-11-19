@@ -30,9 +30,7 @@
       error = authError.message;
       return;
     }
-    // Whatever happens next on the Supabase side, every new sign-up sees the
-    // "revisa tu correo" screen (also for an already-registered address, which
-    // Supabase deliberately answers identically to avoid leaking accounts).
+
     await goto(`/check-email?email=${encodeURIComponent(email)}`);
   }
 </script>

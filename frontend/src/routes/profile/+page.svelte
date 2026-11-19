@@ -13,8 +13,6 @@
   let uploading = $state(false);
   let avatarError = $state<string | null>(null);
 
-  // Keeps the input in sync with the profile once it loads/refreshes,
-  // without clobbering what the user is actively typing.
   $effect(() => {
     if ($auth.profile && !savingName) displayName = $auth.profile.display_name;
   });

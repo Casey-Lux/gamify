@@ -28,7 +28,7 @@ const initialState: StoreState = {
 
 function createStoreStore() {
   const { subscribe, update, set } = writable<StoreState>(initialState);
-  /** What the data on screen was fetched for: workspace + `versionOf('store')`. */
+
   let loadedFor: { workspaceId: string; version: number } | null = null;
 
   async function load(workspaceId: string) {
@@ -46,10 +46,6 @@ function createStoreStore() {
     }
   }
 
-  /** Called when the Store view opens: queries only if nothing was fetched yet
-   * for this workspace or a purchase / new item invalidated it. Effects that
-   * expire while the view is open are dropped locally (see ActiveEffectsList);
-   * whether one really applies is always decided by Postgres. */
   function ensureLoaded(workspaceId: string) {
     if (loadedFor?.workspaceId !== workspaceId || loadedFor.version !== versionOf('store')) {
       return load(workspaceId);
@@ -57,11 +53,6 @@ function createStoreStore() {
     return Promise.resolve();
   }
 
-  /**
-   * Returns the purchase result on success (caller uses it to show a toast
-   * and refresh the profile balance/skills), or null if it failed (the
-   * failure reason is left in state.purchaseError).
-   */
   async function purchase(itemId: string, workspaceId: string) {
     update((s) => ({ ...s, purchasingId: itemId, purchaseError: null }));
     try {
@@ -71,8 +62,7 @@ function createStoreStore() {
       return result;
     } catch (err) {
       update((s) => ({ ...s, purchasingId: null, purchaseError: describePurchaseError(err) }));
-      // The database just refused the purchase (no funds / out of stock / item
-      // gone): the stock and price on screen may be stale, so show the real ones.
+
       void load(workspaceId);
       return null;
     }

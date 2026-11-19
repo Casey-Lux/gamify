@@ -1,23 +1,3 @@
--- =============================================================================
--- 0027_habits.sql
--- Hábitos = misiones recurrentes.
---
--- Diseño (cambio mínimo, reutiliza la economía existente):
---   * `habits` guarda la CONFIGURACIÓN (título, frecuencia, recordatorio...).
---   * Cada vez que el usuario cumple un hábito en un día, `complete_habit`
---     crea una misión "ocurrencia" (missions.habit_id + habit_date) y llama a
---     la RPC existente `complete_mission`. Así XP, monedas, efectos activos,
---     niveles, skills, wallet_transactions y mission_completions (historial
---     inmutable usado por las estadísticas) funcionan SIN cambios.
---   * Solo existen misiones para ocurrencias CUMPLIDAS: los días no cumplidos
---     se derivan (días programados - ocurrencias), por lo que no hace falta
---     ningún job nocturno.
---   * `habit_schedule_history` es un registro append-only del calendario
---     (días de la semana + fecha de entrada en vigor). Cambiar la frecuencia
---     de un hábito nunca reescribe cómo se evaluaba el pasado.
---   * Los hábitos no se borran (se archivan): el historial debe conservarse.
--- =============================================================================
-
 create table public.habits (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references public.workspaces (id) on delete cascade,
@@ -29,16 +9,15 @@ create table public.habits (
   difficulty    public.mission_difficulty not null default 'EASY',
   xp_reward     integer not null default 0,
   coin_reward   integer not null default 0,
-  -- ISO weekday numbers: 1 = lunes ... 7 = domingo. "Diario" = los 7 días.
+
   days_of_week  smallint[] not null default '{1,2,3,4,5,6,7}',
-  -- Fecha local (del usuario) desde la que rige days_of_week actual.
+
   schedule_effective_from date not null default current_date,
-  -- Planificación dentro del plan diario.
+
   day_part      text not null default 'ANYTIME',
-  -- Hora local del recordatorio; null = sin recordatorio.
+
   reminder_time time,
-  -- Si true, la app puede relajar días con un patrón claro de incumplimiento
-  -- (derivado en el cliente; nunca modifica days_of_week ni el historial).
+
   adaptive      boolean not null default true,
   archived_at   timestamptz,
   created_at    timestamptz not null default now(),
@@ -60,8 +39,6 @@ for each row execute function public.set_updated_at();
 
 create index habits_user_idx on public.habits (user_id) where archived_at is null;
 
--- Normaliza days_of_week (sin duplicados, ordenado) y valida que skill/área
--- pertenezcan al workspace y el usuario sea miembro (misma regla que missions).
 create or replace function public.habits_validate()
 returns trigger
 language plpgsql
@@ -100,9 +77,6 @@ create trigger habits_before_write_validate
 before insert or update on public.habits
 for each row execute function public.habits_validate();
 
--- ---------------------------------------------------------------------------
--- Historial de calendario (append-only desde el punto de vista del cliente).
--- ---------------------------------------------------------------------------
 create table public.habit_schedule_history (
   habit_id       uuid not null references public.habits (id) on delete cascade,
   effective_from date not null,
@@ -122,8 +96,6 @@ begin
     return new;
   end if;
 
-  -- Dos cambios el mismo día colapsan en uno (no ha transcurrido ningún día
-  -- evaluable entre ellos, así que no se pierde información).
   insert into public.habit_schedule_history (habit_id, effective_from, days_of_week)
   values (new.id, new.schedule_effective_from, new.days_of_week)
   on conflict (habit_id, effective_from)
@@ -137,15 +109,12 @@ create trigger habits_after_write_schedule
 after insert or update of days_of_week on public.habits
 for each row execute function public.habits_record_schedule();
 
--- ---------------------------------------------------------------------------
--- RLS + privilegios (mismo patrón que 0015/0016)
--- ---------------------------------------------------------------------------
 alter table public.habits enable row level security;
 alter table public.habit_schedule_history enable row level security;
 
 revoke all on public.habits from authenticated, anon;
 grant select, insert on public.habits to authenticated;
--- skill_id / workspace_id / user_id no son editables tras la creación.
+
 grant update (
   title, description, difficulty, xp_reward, coin_reward, area_id,
   days_of_week, schedule_effective_from, day_part, reminder_time, adaptive, archived_at
@@ -174,25 +143,18 @@ create policy habit_schedule_history_select_self on public.habit_schedule_histor
     where h.id = habit_schedule_history.habit_id and h.user_id = auth.uid()
   ));
 
--- ---------------------------------------------------------------------------
--- missions: columnas de ocurrencia de hábito
--- ---------------------------------------------------------------------------
 alter table public.missions
   add column habit_id   uuid references public.habits (id) on delete restrict,
   add column habit_date date,
   add constraint missions_habit_columns_together
     check ((habit_id is null) = (habit_date is null));
 
--- Un hábito solo puede tener una ocurrencia por día.
 create unique index missions_habit_occurrence_unique
   on public.missions (habit_id, habit_date) where habit_id is not null;
 
 comment on column public.missions.habit_id is
   'Set only by complete_habit: this mission is the completed occurrence of a habit on habit_date.';
 
--- 0015 concede INSERT a nivel de tabla, así que las columnas nuevas serían
--- insertables por el cliente. Este guard (sin tocar los grants existentes)
--- garantiza que solo complete_habit (SECURITY DEFINER) crea ocurrencias.
 create or replace function public.missions_guard_habit_columns()
 returns trigger
 language plpgsql
@@ -210,12 +172,6 @@ create trigger missions_guard_habit_columns_trg
 before insert on public.missions
 for each row execute function public.missions_guard_habit_columns();
 
--- ---------------------------------------------------------------------------
--- complete_habit: crea la ocurrencia y delega TODA la economía en
--- complete_mission (sin duplicar su lógica). Atómica: una sola llamada.
--- Errores: GM001 sin sesión, GM002 no es tu hábito, GM003 no existe,
---          GM004 ya cumplido ese día, GM008 archivado / fecha no válida.
--- ---------------------------------------------------------------------------
 create or replace function public.complete_habit(p_habit_id uuid, p_date date)
 returns table (
   mission_id          uuid,
@@ -251,7 +207,6 @@ begin
     raise exception 'not authenticated' using errcode = 'GM001';
   end if;
 
-  -- Bloquea el hábito: serializa llamadas concurrentes para el mismo hábito.
   select * into v_habit from public.habits where id = p_habit_id for update;
 
   if v_habit.id is null then
@@ -263,8 +218,7 @@ begin
   if v_habit.archived_at is not null then
     raise exception 'habit is archived' using errcode = 'GM008';
   end if;
-  -- La fecha es la local del usuario; el servidor solo tolera ±1 día de
-  -- desfase de zona horaria respecto a su propia fecha.
+
   if p_date is null or abs(p_date - current_date) > 1 then
     raise exception 'invalid habit date' using errcode = 'GM008';
   end if;

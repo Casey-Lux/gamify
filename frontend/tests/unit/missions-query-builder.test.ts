@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { applyFilters, applySort, buildStatusClause } from '../../src/lib/api/missions';
 import { EMPTY_MISSION_FILTERS } from '../../src/lib/types/mission-query';
 
-/**
- * Records every call made on it and returns itself, mimicking the relevant
- * subset of the Supabase/PostgREST query builder's chainable API, so we can
- * assert on *which* filters were applied without needing a real database.
- */
 function createFakeQuery() {
   const calls: { method: string; args: unknown[] }[] = [];
   const handler = {
@@ -22,7 +17,7 @@ function createFakeQuery() {
 }
 
 describe('applyFilters', () => {
-  const NOW = new Date(2026, 5, 15, 14, 30).getTime(); // 15 Jun 2026, 14:30 local
+  const NOW = new Date(2026, 5, 15, 14, 30).getTime();
 
   it('applies only the default doing status when everything else is empty', () => {
     const { proxy, calls } = createFakeQuery();
@@ -40,7 +35,7 @@ describe('applyFilters', () => {
 
     expect(calls).toContainEqual({ method: 'eq', args: ['area_id', 'area-1'] });
     expect(calls).toContainEqual({ method: 'eq', args: ['difficulty', 'HARD'] });
-    // No status selected: no status filter at all.
+
     expect(calls.some((c) => c.method === 'or')).toBe(false);
   });
 

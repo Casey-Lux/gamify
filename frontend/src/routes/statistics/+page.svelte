@@ -24,7 +24,6 @@
     { value: 'month', label: 'Mes' }
   ];
 
-  /** 'all' = XP general, otherwise a skill id. */
   let xpScope = $state<string>('all');
 
   onMount(() => {
@@ -158,9 +157,6 @@
     }
   });
 
-  // Accumulated XP. Baseline = XP held right now minus what the loaded window
-  // contributed, i.e. everything earned before the first bucket (the totals
-  // come from profiles.total_xp / player_skills.xp, never recomputed).
   const xpScopeEntries = $derived(
     $statisticsStore.completions
       .filter((c) => xpScope === 'all' || c.skill_id === xpScope)

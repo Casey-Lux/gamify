@@ -28,14 +28,11 @@ export interface NotificationsState {
 }
 
 const initialState: NotificationsState = { items: [], unreadCount: 0, loading: false, error: null };
-/** Local re-evaluation tick (no network): reminders whose time arrives and
- * deadlines that pass while the app stays open. */
+
 const RECOMPUTE_INTERVAL_MS = 60 * 1000;
 
-/** Which source groups to refetch. `all` is the initial load. */
 type Scope = 'all' | 'missions' | 'habits' | 'store';
 
-/** The raw rows notifications are derived from, kept in memory. */
 interface Sources {
   missions: DueMission[];
   activeEffects: ConsumableActivation[];
@@ -55,14 +52,9 @@ function createNotificationsStore() {
   let stopInvalidation: (() => void) | null = null;
   let inFlight: Promise<void> | null = null;
   let sources: Sources | null = null;
-  /** Scopes requested while a refresh was already running. */
+
   let pending = new Set<Scope>();
 
-  /**
-   * Derives the notification list from the in-memory sources at the CURRENT
-   * time. Purely local: it is what makes a reminder show up when its hour
-   * arrives, without querying Supabase again.
-   */
   function recompute() {
     if (!sources) return;
     const now = Date.now();
@@ -90,12 +82,11 @@ function createNotificationsStore() {
     const readKeys = sources.readKeys;
     const items = derived
       .map((n) => ({ ...n, read: readKeys.has(n.key) }))
-      // unread first, then newest event first (derive already sorted by time)
+
       .sort((a, b) => Number(a.read) - Number(b.read));
     update((s) => ({ ...s, ...withCount(items) }));
   }
 
-  /** Fetches only the source groups the scope needs (everything on `all`). */
   async function doRefresh(scopes: Set<Scope>) {
     const {
       data: { session }
@@ -107,8 +98,6 @@ function createNotificationsStore() {
     const today = toLocalDateStr(new Date(now));
     update((s) => ({ ...s, loading: true }));
     try {
-      // A completion can add a "bonus obtenido" notification, so completing a
-      // mission or a habit refreshes the bonus list too.
       const [missions, activeEffects, bonusCompletions, overview, readKeys] = await Promise.all([
         wants('missions') ? fetchDueMissions(session.user.id, now) : null,
         wants('store') ? fetchActiveBonusEffects() : null,
@@ -131,8 +120,6 @@ function createNotificationsStore() {
     }
   }
 
-  /** Coalesces concurrent refreshes: requests made while one is running are
-   * merged into a single follow-up run. */
   function refresh(scope: Scope = 'all'): Promise<void> {
     pending.add(scope);
     if (inFlight) return inFlight;
@@ -154,7 +141,7 @@ function createNotificationsStore() {
     const current = get(store);
     const targets = new Set(keys.filter((k) => current.items.some((i) => i.key === k && !i.read)));
     if (targets.size === 0) return;
-    // Optimistic: reflect the read state immediately, persist in background.
+
     update((s) =>
       Object.assign(
         { ...s },
@@ -168,7 +155,7 @@ function createNotificationsStore() {
       } = await supabase.auth.getSession();
       if (session) await markNotificationsRead(session.user.id, [...targets]);
     } catch {
-      // Not persisted (e.g. offline): the next refresh shows the real state.
+      return;
     }
   }
 
@@ -186,14 +173,6 @@ function createNotificationsStore() {
     store: 'store'
   };
 
-  /**
-   * Loads the notifications once and keeps them current WITHOUT polling and
-   * without refetching when the window regains focus: they are refetched
-   * (only the affected sources) when an action invalidates missions, habits
-   * or the store, and re-evaluated locally every minute and when the tab
-   * becomes visible so time-based items (reminders, deadlines, expired
-   * bonuses) still appear on time. Returns a stop function.
-   */
   function start(): () => void {
     void refresh();
     stopInvalidation = onInvalidate((domains) => {

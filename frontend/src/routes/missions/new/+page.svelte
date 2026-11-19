@@ -32,8 +32,6 @@
   let submitting = $state(false);
   let formError = $state<string | null>(null);
 
-  // Only an OWNER can assign a mission to someone else (spec section 4 +
-  // RLS `missions_insert`), so the member list is only ever needed then.
   $effect(() => {
     if (isOwner && workspaceId) {
       void fetchWorkspaceMembers(workspaceId).then((list) => (members = list));

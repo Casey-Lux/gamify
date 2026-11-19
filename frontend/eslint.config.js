@@ -35,14 +35,10 @@ export default [
     }
   },
   {
-    // Node-executed config/tooling files, not part of the browser bundle.
     files: ['*.config.{js,ts}'],
     languageOptions: { globals: { ...globals.node } }
   },
   {
-    // Runs in a ServiceWorkerGlobalScope, not the DOM (`caches`, `clients`,
-    // `skipWaiting`… aren't part of `globals.browser`). See
-    // src/service-worker.ts's own header comment for what this file does.
     files: ['src/service-worker.ts'],
     languageOptions: { globals: { ...globals.serviceworker } }
   },

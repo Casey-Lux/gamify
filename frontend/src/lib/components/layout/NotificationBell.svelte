@@ -12,8 +12,7 @@
 
   function toggle() {
     open = !open;
-    // Re-evaluates what is due right now from the data already in memory;
-    // the sources are refetched when an action changes them, not on every open.
+
     if (open) notificationsStore.recompute();
   }
 
@@ -138,14 +137,13 @@
     border-radius: 0.75rem;
     box-shadow: 0 8px 24px #00000080;
     max-height: min(70vh, 480px);
-    /* Mobile: anchored under the sticky header, full width. */
+
     position: fixed;
     top: 4.5rem;
     left: 0.5rem;
     right: 0.5rem;
   }
   @media (min-width: 860px) {
-    /* Desktop: dropdown next to the bell inside the sidebar. */
     .panel {
       position: absolute;
       top: calc(100% + 0.25rem);

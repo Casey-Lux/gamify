@@ -5,7 +5,7 @@ import type { ConsumableActivation } from '../../src/lib/types/domain';
 import { habitDayInfo } from '../../src/lib/utils/habit-adaptation';
 import { eachDate, addDays } from '../../src/lib/utils/habit-schedule';
 
-const NOW = new Date(2026, 9, 6, 10, 0).getTime(); // 6 oct 2026, 10:00 local (martes)
+const NOW = new Date(2026, 9, 6, 10, 0).getTime();
 const TODAY = '2026-10-06';
 const DAILY = [{ effective_from: '2026-01-01', days_of_week: [1, 2, 3, 4, 5, 6, 7] }];
 
@@ -68,7 +68,7 @@ describe('deriveNotifications', () => {
     const keys = out.map((n) => n.key);
     expect(keys).toContain('overdue:late');
     expect(out.find((n) => n.key.startsWith('due_soon:soon'))).toBeTruthy();
-    // date-only deadline today: the whole day is still on time -> "soon", not overdue
+
     expect(out.find((n) => n.key.startsWith('due_soon:today'))).toBeTruthy();
     expect(keys.some((k) => k.includes('far'))).toBe(false);
   });
@@ -105,7 +105,6 @@ describe('deriveNotifications', () => {
   });
 
   it('reminds a pending habit only once its reminder time has passed', () => {
-    // Not adaptive: isolates the time-of-day rule from the weekday pattern.
     const h = habit({ reminder_time: '09:30:00', adaptive: false });
     const info = habitDayInfo(h, DAILY, [], TODAY);
     expect(
@@ -130,7 +129,7 @@ describe('deriveNotifications', () => {
   it('adds a special reminder for a weak weekday and skips reminders on optional days', () => {
     const from = addDays(TODAY, -56);
     const tuesdays = eachDate(from, addDays(TODAY, -1)).filter((d) => d.endsWith('-') === false);
-    // Complete every day except Tuesdays -> Tuesday plan = OPTIONAL
+
     const done = tuesdays.filter((d) => new Date(d + 'T00:00:00').getDay() !== 2);
     const h = habit({ reminder_time: '09:30:00' });
     const info = habitDayInfo(h, DAILY, done, TODAY);

@@ -20,8 +20,6 @@ describe('validateAvatarFile', () => {
   });
 
   it('rejects a mismatched/unsupported extension even with an allowed MIME type', () => {
-    // Spoofed extension: browsers set `.type` from content sniffing, but a
-    // malicious/renamed file could still carry a disallowed extension.
     expect(() => validateAvatarFile(makeFile('photo.exe', 'image/jpeg', 1024))).toThrow(
       AvatarError
     );

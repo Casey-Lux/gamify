@@ -7,10 +7,9 @@ import {
 } from '../../src/lib/utils/habit-adaptation';
 import { addDays, eachDate, isoWeekday } from '../../src/lib/utils/habit-schedule';
 
-const TODAY = '2026-10-06'; // martes
+const TODAY = '2026-10-06';
 const DAILY = [{ effective_from: '2026-01-01', days_of_week: [1, 2, 3, 4, 5, 6, 7] }];
 
-/** Completes every day in the lookback EXCEPT the given weekdays. */
 function completedExcept(skipWeekdays: number[], keepEvery = 0): string[] {
   const from = addDays(TODAY, -ADAPTATION_CONFIG.windowWeeks * 7);
   let skipped = 0;
@@ -30,7 +29,7 @@ describe('planFromStats', () => {
   });
   it('asks for a REMINDER on a weak but not hopeless day', () => {
     expect(planFromStats(8, 3)).toBe('REMINDER');
-    expect(planFromStats(4, 0)).toBe('REMINDER'); // not enough samples to relax it yet
+    expect(planFromStats(4, 0)).toBe('REMINDER');
   });
   it('relaxes to OPTIONAL only with a clear, well-sampled pattern', () => {
     expect(planFromStats(8, 1)).toBe('OPTIONAL');
@@ -49,7 +48,7 @@ describe('computeWeekdayStats', () => {
 
   it('does not count today as a miss', () => {
     const stats = computeWeekdayStats(DAILY, [], TODAY);
-    // 8 previous Tuesdays inside the window, today's is excluded.
+
     expect(stats[1]?.scheduled).toBe(8);
   });
 
@@ -62,13 +61,13 @@ describe('computeWeekdayStats', () => {
   it('only evaluates scheduled days (uses the schedule history, not adaptation)', () => {
     const weekdaysOnly = [{ effective_from: '2026-01-01', days_of_week: [1, 3, 5] }];
     const stats = computeWeekdayStats(weekdaysOnly, [], TODAY);
-    expect(stats[1]?.scheduled).toBe(0); // Tuesday was never scheduled
+    expect(stats[1]?.scheduled).toBe(0);
     expect(stats[1]?.plan).toBe('REQUIRED');
     expect(stats[0]?.scheduled).toBe(8);
   });
 
   it('recovers automatically when the user starts doing the day again', () => {
-    const recent = eachDate(addDays(TODAY, -28), addDays(TODAY, -1)); // last 4 weeks done
+    const recent = eachDate(addDays(TODAY, -28), addDays(TODAY, -1));
     const older = completedExcept([2]);
     const stats = computeWeekdayStats(DAILY, [...older, ...recent], TODAY);
     expect(stats[1]?.completed).toBe(4);

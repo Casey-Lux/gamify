@@ -17,23 +17,11 @@
   let levelProgress = $state<LevelProgress | null>(null);
   let avatarUrl = $state<string | null>(null);
 
-  // Spec section 24: the card must reflect completar misión / comprar item /
-  // subir nivel / actualizar skill immediately. It never recomputes the
-  // level formula itself (Fase 1 rule) — every time total_xp changes (any
-  // of those four events refreshes `auth.profile`), it re-asks the
-  // `calculate_level_progress` RPC for the current progress bar values.
-  // A primitive, so the effect only re-runs when the XP really changes (not on
-  // every profile refresh that leaves it as it was).
   const totalXp = $derived($auth.profile?.total_xp);
   $effect(() => {
     const xp = totalXp;
     if (xp === undefined) return;
-    // Fase 11: offline, this RPC call fails (it always needs the live
-    // server — spec section 7, the formula is never duplicated
-    // client-side). Swallow the rejection and simply keep whatever
-    // progress bar was last computed rather than raising an unhandled
-    // rejection; `$auth.profile` itself (level/coins/total_xp) still comes
-    // through from the IndexedDB cache regardless.
+
     void fetchLevelProgress(xp)
       .then((p) => (levelProgress = p))
       .catch(() => {});
@@ -49,8 +37,6 @@
     void getAvatarSignedUrl(path).then((url) => (avatarUrl = url));
   });
 
-  // Highest level first (ties: more XP, then name). Presentation only: the
-  // store's data and levels are untouched.
   const orderedSkills = $derived(
     [...$userSkillsStore.skills].sort(
       (a, b) => b.level - a.level || b.xp - a.xp || a.skill_name.localeCompare(b.skill_name)
@@ -60,10 +46,6 @@
   const showDetails = $derived(variant === 'full' || expanded);
   const initial = $derived(($auth.profile?.display_name ?? '?').charAt(0).toUpperCase());
 
-  // Fase 11 (spec section 27): surface whichever of the two data sources
-  // this card renders — profile or per-skill progress — is currently
-  // showing a cached-while-offline copy, picking the more recent of the
-  // two cachedAt timestamps if both happen to be stale at once.
   const cacheNotice = $derived.by(() => {
     const candidates: string[] = [];
     if ($auth.profileFromCache && $auth.profileCachedAt) candidates.push($auth.profileCachedAt);
@@ -163,10 +145,7 @@
     background: var(--surface, #1c1c28);
     border: 1px solid var(--border, #2c2c3a);
   }
-  /* The compact variant is only ever used in the mobile header; at the
-   * desktop breakpoint the Sidebar already renders its own "full" instance,
-   * so this one is hidden rather than duplicated — spec section 25: full
-   * card on desktop, compact card on mobile, never both. */
+
   @media (min-width: 860px) {
     .user-card.compact {
       display: none;
@@ -268,8 +247,6 @@
   .user-card__details {
     display: flex;
     flex-direction: column;
-  }
-  .user-card__details {
     gap: 0.75rem;
     padding-top: 0.6rem;
     border-top: 1px solid var(--border, #2c2c3a);
@@ -305,8 +282,7 @@
     letter-spacing: 0.04em;
     color: var(--text-muted, #a0a0b0);
   }
-  /* One column in the narrow sidebar, two or more where there is room
-   * (profile page), so the list uses the space instead of a single stack. */
+
   .skills-list {
     list-style: none;
     margin: 0;

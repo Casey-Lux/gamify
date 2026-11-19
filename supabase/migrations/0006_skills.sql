@@ -1,10 +1,3 @@
--- =============================================================================
--- 0006_skills.sql
--- spec section 6 "Skills" + section 7 "Niveles" (table shape only; the
--- calculate_level() function itself is introduced in Fase 4 per the spec's own
--- phase ordering, section 54).
--- =============================================================================
-
 create table public.skills (
   id           uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
@@ -14,9 +7,7 @@ create table public.skills (
   updated_at   timestamptz not null default now(),
 
   constraint skills_name_not_blank check (length(trim(name)) > 0),
-  -- Documented secondary decision: unique skill name per workspace. Not
-  -- explicitly required by the spec, but the simplest way to avoid confusing
-  -- duplicate skills (e.g. two "Fitness" skills) in the same workspace's UI.
+
   constraint skills_unique_name_per_workspace unique (workspace_id, name)
 );
 

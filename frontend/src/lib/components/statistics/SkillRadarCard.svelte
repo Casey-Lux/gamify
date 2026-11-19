@@ -9,7 +9,6 @@
 
   let { skills }: Props = $props();
 
-  /** Highest level first (ties: more XP, then name) — same order as the user card. */
   const ranked = $derived(
     [...skills].sort(
       (a, b) => b.level - a.level || b.xp - a.xp || a.skill_name.localeCompare(b.skill_name)
@@ -17,7 +16,6 @@
   );
   const maxLevel = $derived(Math.max(1, ...skills.map((s) => s.level)));
 
-  /** Splits long names over several lines so the axis labels stay readable. */
   function wrap(name: string, width = 14): string[] {
     const lines: string[] = [];
     let line = '';
@@ -66,7 +64,7 @@
       scales: {
         r: {
           beginAtZero: true,
-          // Headroom so the polygon never hugs the outer ring.
+
           suggestedMax: Math.max(4, maxLevel + 1),
           ticks: {
             stepSize: maxLevel > 10 ? Math.ceil(maxLevel / 5) : 1,

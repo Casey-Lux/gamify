@@ -413,3 +413,12 @@ export async function deleteMission(missionId: string): Promise<void> {
   }
   invalidate('missions');
 }
+
+export async function fetchMissionsByIds(ids: string[]): Promise<MissionWithRelations[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase.from('missions').select(MISSION_SELECT).in('id', ids);
+
+  if (error) throw new MissionApiError(error.message, error.code);
+  return (data ?? []) as unknown as MissionWithRelations[];
+}

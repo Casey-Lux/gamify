@@ -11,9 +11,9 @@
   interface Props {
     mission: MissionWithRelations;
     completing: boolean;
-    starting: boolean;
+    starting?: boolean;
     deleting?: boolean;
-    onStart: (missionId: string) => void;
+    onStart?: (missionId: string) => void;
     onComplete: (missionId: string) => void;
     onDelete: (mission: MissionWithRelations) => void;
     onSubtaskToggle: (subtaskId: string, completed: boolean) => void;
@@ -22,9 +22,9 @@
   let {
     mission,
     completing,
-    starting,
+    starting = false,
     deleting = false,
-    onStart,
+    onStart = () => {},
     onComplete,
     onDelete,
     onSubtaskToggle

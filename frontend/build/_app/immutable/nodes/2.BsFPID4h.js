@@ -1,0 +1,1 @@
+import"../chunks/CWj6FrbW.js";import{i}from"../chunks/BePrP2Nb.js";import{o as p}from"../chunks/BrZpjSoB.js";import{p as m,d as r}from"../chunks/C2gN8Au1.js";import{g as s}from"../chunks/BX-dFUYB.js";function g(t,o){m(o,!1),p(()=>{s("/missions")}),i(),r()}export{g as component};

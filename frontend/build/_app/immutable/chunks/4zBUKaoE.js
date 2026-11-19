@@ -1,0 +1,1 @@
+const o={missions:0,habits:0,statistics:0,store:0},s=new Set;function e(n){return o[n]}function i(...n){for(const t of n)o[t]+=1;for(const t of s)t(n)}function r(n){return s.add(n),()=>s.delete(n)}export{i,r as o,e as v};

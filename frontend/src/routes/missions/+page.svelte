@@ -4,6 +4,7 @@
   import { skills, areas, catalogFromCache, catalogCachedAt } from '$lib/stores/catalog';
   import { auth } from '$lib/stores/auth';
   import {
+    startMission,
     completeMission,
     deleteMission,
     setSubtaskCompleted,
@@ -17,6 +18,7 @@
   import CachedNotice from '$lib/components/layout/CachedNotice.svelte';
   import { MISSION_PAGE_SIZE } from '$lib/types/mission-query';
 
+  let startingId = $state<string | null>(null);
   let completingId = $state<string | null>(null);
   let deletingId = $state<string | null>(null);
   let completionError = $state<string | null>(null);
@@ -25,6 +27,21 @@
   onMount(() => {
     void missionsStore.ensureLoaded();
   });
+
+  async function handleStart(missionId: string) {
+    startingId = missionId;
+    completionError = null;
+    try {
+      await startMission(missionId);
+      await missionsStore.load();
+    } catch (err) {
+      completionError =
+        err instanceof MissionApiError ? err.message : 'No se pudo iniciar la misión.';
+      void missionsStore.load();
+    } finally {
+      startingId = null;
+    }
+  }
 
   async function handleComplete(missionId: string) {
     completingId = missionId;
@@ -146,8 +163,10 @@
         <li>
           <MissionCard
             {mission}
+            starting={startingId === mission.id}
             completing={completingId === mission.id}
             deleting={deletingId === mission.id}
+            onStart={handleStart}
             onComplete={handleComplete}
             onDelete={handleDelete}
             onSubtaskToggle={handleSubtaskToggle}

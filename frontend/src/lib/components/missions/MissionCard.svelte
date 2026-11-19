@@ -11,7 +11,9 @@
   interface Props {
     mission: MissionWithRelations;
     completing: boolean;
+    starting: boolean;
     deleting?: boolean;
+    onStart: (missionId: string) => void;
     onComplete: (missionId: string) => void;
     onDelete: (mission: MissionWithRelations) => void;
     onSubtaskToggle: (subtaskId: string, completed: boolean) => void;
@@ -20,13 +22,16 @@
   let {
     mission,
     completing,
+    starting,
     deleting = false,
+    onStart,
     onComplete,
     onDelete,
     onSubtaskToggle
   }: Props = $props();
 
   const isCompleted = $derived(mission.completed_at !== null);
+  const isTodo = $derived(mission.status === 'TODO');
   const overdue = $derived(isOverdue(mission.due_at, mission.completed_at, mission.due_has_time));
   const hasSubtasks = $derived(mission.subtasks.length > 0);
 
@@ -84,16 +89,27 @@
   {/if}
 
   {#if !isCompleted}
-    <button
-      class="mission-card__complete"
-      type="button"
-      disabled={!canComplete}
-      onclick={() => onComplete(mission.id)}
-    >
-      {completing ? 'Completando…' : 'Completar misión'}
-    </button>
-    {#if hasSubtasks && !allSubtasksDone}
-      <p class="mission-card__hint">Completa todas las submisiones para poder finalizar.</p>
+    {#if isTodo}
+      <button
+        class="mission-card__complete"
+        type="button"
+        disabled={starting}
+        onclick={() => onStart(mission.id)}
+      >
+        {starting ? 'Iniciando…' : 'Iniciar misión'}
+      </button>
+    {:else}
+      <button
+        class="mission-card__complete"
+        type="button"
+        disabled={!canComplete}
+        onclick={() => onComplete(mission.id)}
+      >
+        {completing ? 'Completando…' : 'Completar misión'}
+      </button>
+      {#if hasSubtasks && !allSubtasksDone}
+        <p class="mission-card__hint">Completa todas las submisiones para poder finalizar.</p>
+      {/if}
     {/if}
   {/if}
 

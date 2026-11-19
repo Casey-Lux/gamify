@@ -113,6 +113,22 @@ export function applySort(query: any, sort: MissionSort) {
   return query;
 }
 
+export async function startMission(missionId: string): Promise<Mission> {
+  const { data, error } = await supabase
+    .from('missions')
+    .update({ status: 'DOING' })
+    .eq('id', missionId)
+    .eq('status', 'TODO')
+    .select()
+    .maybeSingle();
+
+  if (error) throw new MissionApiError(error.message, error.code);
+  if (!data) throw new MissionApiError('La misión no está lista para iniciar.');
+
+  invalidate('missions');
+  return data as Mission;
+}
+
 export async function completeMission(missionId: string): Promise<CompleteMissionResult> {
   const { data, error } = await supabase.rpc('complete_mission', { p_mission_id: missionId });
 
